@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "./Avatar";
 
 interface ProfileCardProps {
   profileId: string;
@@ -11,24 +12,23 @@ interface ProfileCardProps {
   notes?: string;
   likes: string[];
   dislikes: string[];
+  avatarMdUrl?: string | null;
 }
 
-const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "🐶", cat: "🐱" };
-
-export function ProfileCard({ profileId, name, type, age, notes, likes, dislikes }: ProfileCardProps) {
+export function ProfileCard({ profileId, name, type, age, notes, likes, dislikes, avatarMdUrl }: ProfileCardProps) {
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{typeEmoji[type]}</span>
+          <div className="flex items-center gap-3">
+            <Avatar name={name} type={type} src={avatarMdUrl} size="md" />
             <div>
               <p className="font-semibold text-gray-900">{name}</p>
               <p className="text-xs text-gray-500 capitalize">{type}{age !== undefined ? `, age ${age}` : ""}</p>
             </div>
           </div>
           <Link href={`/profiles/${profileId}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           </Link>

@@ -13,6 +13,9 @@ export const ProfileEntity = new Entity(
       notes: { type: "string" },
       likes: { type: "list", items: { type: "string" }, default: () => [] },
       dislikes: { type: "list", items: { type: "string" }, default: () => [] },
+      avatarSm: { type: "string" },
+      avatarMd: { type: "string" },
+      avatarLg: { type: "string" },
       createdAt: { type: "string", default: () => new Date().toISOString() },
     },
     indexes: {

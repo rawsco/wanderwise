@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { ProfileEntity } from "@/lib/db/profile.entity";
 import { ProfileCard } from "@/components/profile/ProfileCard";
+import { getObjectUrl } from "@/lib/s3";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
@@ -48,6 +49,7 @@ export default async function ProfilesPage() {
               notes={p.notes}
               likes={p.likes ?? []}
               dislikes={p.dislikes ?? []}
+              avatarMdUrl={p.avatarMd ? getObjectUrl(p.avatarMd) : null}
             />
           ))}
         </div>
