@@ -9,8 +9,7 @@ const createSchema = z.object({
   description: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  adults: z.number().int().min(1).default(1),
-  dogs: z.number().int().min(0).default(0),
+  memberIds: z.array(z.string()).default([]),
 });
 
 export async function GET() {

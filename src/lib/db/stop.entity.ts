@@ -19,7 +19,7 @@ export const StopEntity = new Entity(
     indexes: {
       byTrip: {
         pk: { field: "pk", composite: ["tripId"] },
-        sk: { field: "sk", composite: ["order", "stopId"] },
+        sk: { field: "sk", composite: ["stopId"] },
       },
     },
   },

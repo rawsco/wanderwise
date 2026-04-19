@@ -23,17 +23,7 @@ export async function PATCH(
     const body = await req.json();
     const data = updateSchema.parse(body);
 
-    const existing = await StopEntity.query
-      .byTrip({ tripId })
-      .where(({ stopId: sid }, { eq }) => eq(sid, stopId))
-      .go();
-
-    const stop = existing.data[0];
-    if (!stop) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    await StopEntity.update({ tripId, order: stop.order, stopId })
-      .set(data)
-      .go();
+    await StopEntity.update({ tripId, stopId }).set(data).go();
 
     return NextResponse.json({ stopId, tripId, ...data });
   } catch (err) {
@@ -52,15 +42,7 @@ export async function DELETE(
     await requireAuth();
     const { tripId, stopId } = await params;
 
-    const existing = await StopEntity.query
-      .byTrip({ tripId })
-      .where(({ stopId: sid }, { eq }) => eq(sid, stopId))
-      .go();
-
-    const stop = existing.data[0];
-    if (!stop) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    await StopEntity.delete({ tripId, order: stop.order, stopId }).go();
+    await StopEntity.delete({ tripId, stopId }).go();
 
     return NextResponse.json({ success: true });
   } catch {

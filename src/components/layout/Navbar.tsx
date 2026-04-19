@@ -22,9 +22,8 @@ export function Navbar() {
           <div className="hidden sm:flex items-center gap-4">
             {session ? (
               <>
-                <Link href="/trips" className="text-sm text-gray-600 hover:text-gray-900">
-                  My Trips
-                </Link>
+                <Link href="/trips" className="text-sm text-gray-600 hover:text-gray-900">My Trips</Link>
+                <Link href="/profiles" className="text-sm text-gray-600 hover:text-gray-900">Group</Link>
                 <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/" })}>
                   Sign out
                 </Button>

@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { Calendar, MapPin, Users, Dog } from "lucide-react";
+import { Calendar, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+
+const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "🐶", cat: "🐱" };
+
+interface Member { name: string; type: string; }
 
 interface TripCardProps {
   tripId: string;
@@ -8,12 +12,11 @@ interface TripCardProps {
   description?: string;
   startDate?: string;
   endDate?: string;
-  adults: number;
-  dogs: number;
+  members?: Member[];
   stopCount?: number;
 }
 
-export function TripCard({ tripId, name, description, startDate, endDate, adults, dogs, stopCount = 0 }: TripCardProps) {
+export function TripCard({ tripId, name, description, startDate, endDate, members = [], stopCount = 0 }: TripCardProps) {
   return (
     <Link href={`/trips/${tripId}`}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
@@ -37,14 +40,9 @@ export function TripCard({ tripId, name, description, startDate, endDate, adults
               <MapPin className="h-3.5 w-3.5" />
               {stopCount} {stopCount === 1 ? "stop" : "stops"}
             </span>
-            <span className="flex items-center gap-1">
-              <Users className="h-3.5 w-3.5" />
-              {adults}
-            </span>
-            {dogs > 0 && (
+            {members.length > 0 && (
               <span className="flex items-center gap-1">
-                <Dog className="h-3.5 w-3.5" />
-                {dogs}
+                {members.map(m => typeEmoji[m.type] ?? "👤").join(" ")}
               </span>
             )}
           </div>

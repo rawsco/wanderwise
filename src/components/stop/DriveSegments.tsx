@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useMapsLibrary } from "@vis.gl/react-google-maps";
 
 interface Stop {
   lat: number;
@@ -18,13 +19,12 @@ interface DriveSegmentsProps {
 }
 
 export function DriveSegments({ stops, onSegmentsLoaded }: DriveSegmentsProps) {
-  const [loading, setLoading] = useState(false);
+  const routesLib = useMapsLibrary("routes");
 
   useEffect(() => {
-    if (stops.length < 2 || !window.google) return;
+    if (!routesLib || stops.length < 2) return;
 
-    setLoading(true);
-    const service = new window.google.maps.DirectionsService();
+    const service = new routesLib.DirectionsService();
     const pairs = stops.slice(0, -1).map((_, i) => ({ origin: stops[i], destination: stops[i + 1] }));
 
     Promise.all(
@@ -34,7 +34,7 @@ export function DriveSegments({ stops, onSegmentsLoaded }: DriveSegmentsProps) {
             {
               origin: { lat: origin.lat, lng: origin.lng },
               destination: { lat: destination.lat, lng: destination.lng },
-              travelMode: window.google.maps.TravelMode.DRIVING,
+              travelMode: routesLib.TravelMode.DRIVING,
             },
             (result, status) => {
               if (status === "OK" && result?.routes[0]?.legs[0]) {
@@ -47,12 +47,8 @@ export function DriveSegments({ stops, onSegmentsLoaded }: DriveSegmentsProps) {
           );
         })
       )
-    ).then(segments => {
-      onSegmentsLoaded(segments);
-      setLoading(false);
-    });
-  }, [stops, onSegmentsLoaded]);
+    ).then(onSegmentsLoaded);
+  }, [routesLib, stops, onSegmentsLoaded]);
 
-  if (loading) return <p className="text-xs text-gray-400 pl-9">Calculating drive times…</p>;
   return null;
 }

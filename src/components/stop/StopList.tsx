@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronUp, ChevronDown, Trash2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -17,38 +16,12 @@ interface Stop {
 }
 
 interface StopListProps {
-  initialStops: Stop[];
-  driveSegments: { duration: string; distance: string }[];
+  stops: Stop[];
+  onMove: (stopId: string, direction: "up" | "down") => void;
+  onRemove: (stopId: string) => void;
 }
 
-export function StopList({ initialStops, driveSegments }: StopListProps) {
-  const [stops, setStops] = useState(initialStops);
-
-  async function move(index: number, direction: "up" | "down") {
-    const newStops = [...stops];
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    [newStops[index], newStops[targetIndex]] = [newStops[targetIndex], newStops[index]];
-    setStops(newStops);
-
-    await Promise.all([
-      fetch(`/api/trips/${stops[0].tripId}/stops/${newStops[index].stopId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: index }),
-      }),
-      fetch(`/api/trips/${stops[0].tripId}/stops/${newStops[targetIndex].stopId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: targetIndex }),
-      }),
-    ]);
-  }
-
-  async function remove(stop: Stop) {
-    await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}`, { method: "DELETE" });
-    setStops(prev => prev.filter(s => s.stopId !== stop.stopId));
-  }
-
+export function StopList({ stops, onMove, onRemove }: StopListProps) {
   if (stops.length === 0) {
     return (
       <div className="text-center py-8 text-gray-400">
@@ -64,7 +37,7 @@ export function StopList({ initialStops, driveSegments }: StopListProps) {
         <li key={stop.stopId}>
           <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white transition-colors">
             <span className="flex-shrink-0 h-6 w-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center mt-0.5">
-              {i + 1}
+              {i === 0 ? "S" : i + 1}
             </span>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm text-gray-900 truncate">{stop.name}</p>
@@ -78,26 +51,18 @@ export function StopList({ initialStops, driveSegments }: StopListProps) {
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
-              <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === 0} onClick={() => move(i, "up")}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === 0} onClick={() => onMove(stop.stopId, "up")}>
                 <ChevronUp className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === stops.length - 1} onClick={() => move(i, "down")}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === stops.length - 1} onClick={() => onMove(stop.stopId, "down")}>
                 <ChevronDown className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => remove(stop)}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => onRemove(stop.stopId)}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
-          {i < stops.length - 1 && driveSegments[i] && (
-            <div className="flex items-center gap-1.5 pl-9 py-1 text-xs text-gray-400">
-              <span>↓</span>
-              <span>{driveSegments[i].duration}</span>
-              <span>·</span>
-              <span>{driveSegments[i].distance}</span>
-            </div>
-          )}
-          {i < stops.length - 1 && !driveSegments[i] && (
+          {i < stops.length - 1 && (
             <div className="pl-9 py-1 text-xs text-gray-300">↓</div>
           )}
         </li>

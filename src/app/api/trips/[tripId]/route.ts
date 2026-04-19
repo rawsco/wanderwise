@@ -9,8 +9,7 @@ const updateSchema = z.object({
   description: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  adults: z.number().int().min(1).optional(),
-  dogs: z.number().int().min(0).optional(),
+  memberIds: z.array(z.string()).optional(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ tripId: string }> }) {

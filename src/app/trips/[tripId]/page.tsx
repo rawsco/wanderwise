@@ -4,13 +4,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { TripEntity } from "@/lib/db/trip.entity";
 import { StopEntity } from "@/lib/db/stop.entity";
-import { TripMap } from "@/components/trip/TripMap";
-import { StopList } from "@/components/stop/StopList";
-import { StopSearch } from "@/components/stop/StopSearch";
-import { DriveSegments } from "@/components/stop/DriveSegments";
+import { ProfileEntity } from "@/lib/db/profile.entity";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Dog, Pencil, ArrowLeft } from "lucide-react";
+import { Calendar, Pencil, ArrowLeft } from "lucide-react";
 import { TripDetailClient } from "./TripDetailClient";
+
+const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "🐶", cat: "🐱" };
 
 export default async function TripDetailPage({ params }: { params: Promise<{ tripId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -18,16 +17,21 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
 
   const { tripId } = await params;
 
-  const tripResult = await TripEntity.query
-    .byUser({ userId: session.user.id })
-    .where(({ tripId: tid }, { eq }) => eq(tid, tripId))
-    .go();
+  const [tripResult, profilesResult] = await Promise.all([
+    TripEntity.query.byUser({ userId: session.user.id })
+      .where(({ tripId: tid }, { eq }) => eq(tid, tripId))
+      .go(),
+    ProfileEntity.query.byUser({ userId: session.user.id }).go(),
+  ]);
 
   const trip = tripResult.data[0];
   if (!trip) notFound();
 
   const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
   const stops = stopsResult.data.sort((a, b) => a.order - b.order);
+
+  const profileMap = Object.fromEntries(profilesResult.data.map(p => [p.profileId, p]));
+  const members = (trip.memberIds ?? []).map(id => profileMap[id]).filter(Boolean);
 
   return (
     <div>
@@ -46,14 +50,12 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
                 {trip.endDate ? new Date(trip.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "TBD"}
               </span>
             )}
-            <span className="flex items-center gap-1.5">
-              <Users className="h-4 w-4" />
-              {trip.adults} {trip.adults === 1 ? "adult" : "adults"}
-            </span>
-            {(trip.dogs ?? 0) > 0 && (
+            {members.length > 0 && (
               <span className="flex items-center gap-1.5">
-                <Dog className="h-4 w-4" />
-                {trip.dogs} {trip.dogs === 1 ? "dog" : "dogs"}
+                {members.map(m => (
+                  <span key={m.profileId} title={m.name}>{typeEmoji[m.type] ?? "👤"}</span>
+                ))}
+                <span>{members.map(m => m.name).join(", ")}</span>
               </span>
             )}
           </div>
