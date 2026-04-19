@@ -36,11 +36,13 @@ export function ProfileForm({ profileId, defaultValues }: ProfileFormProps) {
   const [likes, setLikes] = useState<string[]>(defaultValues?.likes ?? []);
   const [dislikes, setDislikes] = useState<string[]>(defaultValues?.dislikes ?? []);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(schema) as any,
     defaultValues: { type: "adult", ...defaultValues },
   });
+
+  const type = watch("type");
 
   async function onSubmit(data: FormValues) {
     const url = profileId ? `/api/profiles/${profileId}` : "/api/profiles";
@@ -78,10 +80,12 @@ export function ProfileForm({ profileId, defaultValues }: ProfileFormProps) {
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="age">Age (optional)</Label>
-        <Input id="age" type="number" min={0} placeholder="e.g. 8" {...register("age", { valueAsNumber: true })} />
-      </div>
+      {(type === "adult" || type === "child") && (
+        <div className="space-y-1.5">
+          <Label htmlFor="age">Age (optional)</Label>
+          <Input id="age" type="number" min={0} placeholder="e.g. 8" {...register("age", { valueAsNumber: true })} />
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="notes">Notes (optional)</Label>

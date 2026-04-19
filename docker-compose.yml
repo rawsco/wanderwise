@@ -3,7 +3,9 @@ services:
     image: amazon/dynamodb-local
     ports:
       - "8000:8000"
-    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
+    volumes:
+      - ./docker-data/dynamodb:/home/dynamodblocal/data
 
   minio:
     image: minio/minio

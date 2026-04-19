@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 interface AvatarProps {
   name: string;
   type: string;
@@ -36,9 +34,8 @@ export function Avatar({ name, type, src, size = "md" }: AvatarProps) {
 
   if (src) {
     return (
-      <div className={`${rounded} flex-shrink-0`} style={{ width: px, height: px }}>
-        <Image src={src} alt={name} width={px} height={px} className="object-cover w-full h-full" />
-      </div>
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={name} width={px} height={px} className={`${rounded} object-cover flex-shrink-0`} style={{ width: px, height: px }} />
     );
   }
 
