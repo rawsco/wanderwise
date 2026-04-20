@@ -254,7 +254,7 @@ function StopItem({
         {!isStart && !isEnd && (
           editing ? (
             <div className="mt-2 space-y-2 overflow-hidden">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 overflow-hidden">
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-[10px] text-gray-400">Arrival date</p>
                   <Input
@@ -323,18 +323,18 @@ function StopItem({
       <div className="flex items-center gap-0.5 flex-shrink-0">
         <Link
           href={`/trips/${stop.tripId}/stops/${stop.stopId}`}
-          className="h-11 w-11 sm:h-7 sm:w-7 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-accent transition-colors"
+          className="h-11 w-11 lg:h-8 lg:w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-accent transition-colors"
         >
-          <ArrowRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+          <ArrowRight className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </Link>
-        <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-7 sm:w-7" disabled={index === 0} onClick={() => onMove(stop.stopId, "up")}>
-          <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+        <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8" disabled={index === 0} onClick={() => onMove(stop.stopId, "up")}>
+          <ChevronUp className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-7 sm:w-7" disabled={index === total - 1} onClick={() => onMove(stop.stopId, "down")}>
-          <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+        <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8" disabled={index === total - 1} onClick={() => onMove(stop.stopId, "down")}>
+          <ChevronDown className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-7 sm:w-7 text-red-400 hover:text-red-600" onClick={() => onRemove(stop.stopId)}>
-          <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+        <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8 text-red-400 hover:text-red-600" onClick={() => onRemove(stop.stopId)}>
+          <Trash2 className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </Button>
       </div>
     </div>

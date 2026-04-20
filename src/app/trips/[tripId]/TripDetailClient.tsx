@@ -212,23 +212,25 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
       {/* Mobile tab bar */}
       <div className="lg:hidden flex rounded-xl border border-gray-200 overflow-hidden mb-4 bg-white">
         <button
+          type="button"
           onClick={() => setMobileTab("route")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-            mobileTab === "route"
-              ? "bg-emerald-600 text-white"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className="flex-1 flex items-center justify-center gap-2 min-h-11 py-3 text-sm font-medium transition-colors"
+          style={{
+            backgroundColor: mobileTab === "route" ? "#059669" : "transparent",
+            color: mobileTab === "route" ? "#ffffff" : "#6b7280",
+          }}
         >
           <List className="h-4 w-4" />
           Route
         </button>
         <button
+          type="button"
           onClick={() => setMobileTab("map")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-            mobileTab === "map"
-              ? "bg-emerald-600 text-white"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className="flex-1 flex items-center justify-center gap-2 min-h-11 py-3 text-sm font-medium transition-colors"
+          style={{
+            backgroundColor: mobileTab === "map" ? "#059669" : "transparent",
+            color: mobileTab === "map" ? "#ffffff" : "#6b7280",
+          }}
         >
           <Map className="h-4 w-4" />
           Map

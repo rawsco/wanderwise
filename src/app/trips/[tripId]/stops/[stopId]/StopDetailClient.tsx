@@ -34,8 +34,13 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function formatNoteDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}, ${hh}:${mm}`;
 }
 
 function nightsBetween(a: string, b: string) {
@@ -239,7 +244,7 @@ export function StopDetailClient({ stop, isStart, isEnd, initialNotes, contact, 
                     <div key={note.noteId} className="group relative rounded-lg bg-gray-50 border border-gray-100 px-3 py-2.5">
                       <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.text}</p>
                       <div className="flex items-center justify-between mt-1.5">
-                        <p className="text-[11px] text-gray-400">{formatNoteDate(note.createdAt)}</p>
+                        <p className="text-[11px] text-gray-400" suppressHydrationWarning>{formatNoteDate(note.createdAt)}</p>
                         <button
                           onClick={() => deleteNote(note.noteId)}
                           disabled={deleting === note.noteId}
@@ -265,7 +270,7 @@ export function StopDetailClient({ stop, isStart, isEnd, initialNotes, contact, 
                   onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitNote(); }}
                   placeholder="Add a note — confirmation number, contact name, pitch details…"
                   rows={3}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-base text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
                 <Button
                   onClick={submitNote}

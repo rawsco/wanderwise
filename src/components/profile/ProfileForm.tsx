@@ -35,6 +35,7 @@ export function ProfileForm({ profileId, defaultValues }: ProfileFormProps) {
   const router = useRouter();
   const [likes, setLikes] = useState<string[]>(defaultValues?.likes ?? []);
   const [dislikes, setDislikes] = useState<string[]>(defaultValues?.dislikes ?? []);
+  const currentYear = new Date().getFullYear();
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,7 +84,7 @@ export function ProfileForm({ profileId, defaultValues }: ProfileFormProps) {
       {(type === "adult" || type === "child") && (
         <div className="space-y-1.5">
           <Label htmlFor="yearOfBirth">Year of birth (optional)</Label>
-          <Input id="yearOfBirth" type="number" min={1900} max={new Date().getFullYear()} placeholder={`e.g. ${new Date().getFullYear() - 8}`} {...register("yearOfBirth", { valueAsNumber: true })} />
+          <Input id="yearOfBirth" type="number" min={1900} max={currentYear} placeholder={`e.g. ${currentYear - 8}`} {...register("yearOfBirth", { valueAsNumber: true })} />
         </div>
       )}
 

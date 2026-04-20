@@ -151,7 +151,7 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
           </div>
 
           {showDates && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 overflow-hidden">
               <div className="space-y-1 min-w-0">
                 <Label className="text-xs">Arrival date</Label>
                 <Input

@@ -51,7 +51,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="max-w-sm mx-auto pt-8">
+    <div className="max-w-md mx-auto pt-8">
       <Card>
         <CardHeader>
           <CardTitle>Create your account</CardTitle>

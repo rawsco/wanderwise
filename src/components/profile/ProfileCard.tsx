@@ -27,7 +27,7 @@ export function ProfileCard({ profileId, name, type, yearOfBirth, notes, likes, 
               <p className="text-xs text-gray-500 capitalize">{type}{yearOfBirth !== undefined ? `, born ${yearOfBirth}` : ""}</p>
             </div>
           </div>
-          <Link href={`/profiles/${profileId}`}>
+          <Link href={`/profiles/${profileId}`} aria-label={`Edit ${name}`}>
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
               <Pencil className="h-3.5 w-3.5" />
             </Button>

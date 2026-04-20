@@ -19,7 +19,7 @@ export function Navbar() {
             WanderWise
           </Link>
 
-          <div className="hidden sm:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4">
             {session ? (
               <>
                 <Link href="/trips" className="text-sm text-gray-600 hover:text-gray-900">My Trips</Link>
@@ -40,18 +40,18 @@ export function Navbar() {
             )}
           </div>
 
-          <button className="sm:hidden p-2" onClick={() => setOpen(!open)}>
+          <button type="button" aria-label="Toggle menu" className="lg:hidden p-2" onClick={() => setOpen(!open)}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
 
         {open && (
-          <div className="sm:hidden border-t border-gray-100 py-2 flex flex-col">
+          <div className="lg:hidden border-t border-gray-100 py-2 flex flex-col">
             {session ? (
               <>
                 <Link href="/trips" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>My Trips</Link>
                 <Link href="/profiles" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>Group</Link>
-                <button className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
+                <button type="button" className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
               </>
             ) : (
               <>
