@@ -13,7 +13,7 @@ import { TagInput } from "./TagInput";
 const schema = z.object({
   name: z.string().min(1, "Name required"),
   type: z.enum(["adult", "child", "dog", "cat"]),
-  age: z.number().int().min(0).optional(),
+  yearOfBirth: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
   notes: z.string().optional(),
 });
 
@@ -82,8 +82,8 @@ export function ProfileForm({ profileId, defaultValues }: ProfileFormProps) {
 
       {(type === "adult" || type === "child") && (
         <div className="space-y-1.5">
-          <Label htmlFor="age">Age (optional)</Label>
-          <Input id="age" type="number" min={0} placeholder="e.g. 8" {...register("age", { valueAsNumber: true })} />
+          <Label htmlFor="yearOfBirth">Year of birth (optional)</Label>
+          <Input id="yearOfBirth" type="number" min={1900} max={new Date().getFullYear()} placeholder={`e.g. ${new Date().getFullYear() - 8}`} {...register("yearOfBirth", { valueAsNumber: true })} />
         </div>
       )}
 

@@ -26,20 +26,27 @@ export default function RegisterPage() {
   });
 
   async function onSubmit(data: FormValues) {
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-    if (res.status === 409) {
-      setError("email", { message: "Email already registered" });
-      return;
-    }
+      if (res.status === 409) {
+        setError("email", { message: "Email already registered" });
+        return;
+      }
 
-    if (res.ok) {
+      if (!res.ok) {
+        setError("email", { message: "Registration failed — please try again" });
+        return;
+      }
+
       await signIn("credentials", { email: data.email, password: data.password, redirect: false });
       router.push("/trips");
+    } catch {
+      setError("email", { message: "Registration failed — please try again" });
     }
   }
 

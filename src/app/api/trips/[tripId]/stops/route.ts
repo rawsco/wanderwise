@@ -9,8 +9,11 @@ const createSchema = z.object({
   address: z.string().min(1),
   lat: z.number(),
   lng: z.number(),
+  placeId: z.string().optional(),
   arrivalDate: z.string().optional(),
   departureDate: z.string().optional(),
+  checkInTime: z.string().optional(),
+  checkOutTime: z.string().optional(),
 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ tripId: string }> }) {

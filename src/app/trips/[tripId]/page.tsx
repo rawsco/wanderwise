@@ -8,6 +8,7 @@ import { ProfileEntity } from "@/lib/db/profile.entity";
 import { Button } from "@/components/ui/button";
 import { Calendar, Pencil, ArrowLeft } from "lucide-react";
 import { TripDetailClient } from "./TripDetailClient";
+import { sortStopsByDate } from "@/lib/stops";
 
 const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "🐶", cat: "🐱" };
 
@@ -28,7 +29,10 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
   if (!trip) notFound();
 
   const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
-  const stops = stopsResult.data.sort((a, b) => a.order - b.order);
+  const stops = sortStopsByDate(stopsResult.data).map(s => ({
+    ...s,
+    bookingStatus: s.bookingStatus as "enquiry" | "pending" | "confirmed" | undefined,
+  }));
 
   const profileMap = Object.fromEntries(profilesResult.data.map(p => [p.profileId, p]));
   const members = (trip.memberIds ?? []).map(id => profileMap[id]).filter(Boolean);
@@ -68,7 +72,12 @@ export default async function TripDetailPage({ params }: { params: Promise<{ tri
         </Link>
       </div>
 
-      <TripDetailClient tripId={tripId} initialStops={stops} />
+      <TripDetailClient
+        tripId={tripId}
+        initialStops={stops}
+        tripStartDate={trip.startDate}
+        tripEndDate={trip.endDate}
+      />
     </div>
   );
 }

@@ -45,7 +45,7 @@ export default async function ProfilesPage() {
               profileId={p.profileId}
               name={p.name}
               type={p.type}
-              age={p.age}
+              yearOfBirth={p.yearOfBirth}
               notes={p.notes}
               likes={p.likes ?? []}
               dislikes={p.dislikes ?? []}

@@ -14,6 +14,13 @@ export const StopEntity = new Entity(
       lng: { type: "number", required: true },
       arrivalDate: { type: "string" },
       departureDate: { type: "string" },
+      checkInTime: { type: "string" },
+      checkOutTime: { type: "string" },
+      bookingStatus: { type: "string" },
+      placeId: { type: "string" },
+      notes: { type: "any" },
+      summary: { type: "string" },
+      summaryGeneratedAt: { type: "string" },
       createdAt: { type: "string", default: () => new Date().toISOString() },
     },
     indexes: {

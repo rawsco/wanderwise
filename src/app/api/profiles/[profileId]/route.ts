@@ -6,7 +6,7 @@ import { ProfileEntity } from "@/lib/db/profile.entity";
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   type: z.enum(["adult", "child", "dog", "cat"]).optional(),
-  age: z.number().int().min(0).optional(),
+  yearOfBirth: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
   notes: z.string().optional(),
   likes: z.array(z.string()).optional(),
   dislikes: z.array(z.string()).optional(),

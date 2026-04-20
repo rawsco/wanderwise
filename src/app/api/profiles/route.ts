@@ -7,7 +7,7 @@ import { ProfileEntity } from "@/lib/db/profile.entity";
 const createSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["adult", "child", "dog", "cat"]),
-  age: z.number().int().min(0).optional(),
+  yearOfBirth: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
   notes: z.string().optional(),
   likes: z.array(z.string()).default([]),
   dislikes: z.array(z.string()).default([]),

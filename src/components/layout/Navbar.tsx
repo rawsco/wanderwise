@@ -46,16 +46,17 @@ export function Navbar() {
         </div>
 
         {open && (
-          <div className="sm:hidden border-t border-gray-100 py-4 flex flex-col gap-3">
+          <div className="sm:hidden border-t border-gray-100 py-2 flex flex-col">
             {session ? (
               <>
-                <Link href="/trips" className="text-sm text-gray-600" onClick={() => setOpen(false)}>My Trips</Link>
-                <button className="text-sm text-left text-gray-600" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
+                <Link href="/trips" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>My Trips</Link>
+                <Link href="/profiles" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>Group</Link>
+                <button className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
               </>
             ) : (
               <>
-                <Link href="/login" className="text-sm text-gray-600" onClick={() => setOpen(false)}>Sign in</Link>
-                <Link href="/register" className="text-sm text-gray-600" onClick={() => setOpen(false)}>Get started</Link>
+                <Link href="/login" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>Sign in</Link>
+                <Link href="/register" className="flex items-center text-sm text-emerald-600 font-medium py-3 px-1" onClick={() => setOpen(false)}>Get started</Link>
               </>
             )}
           </div>

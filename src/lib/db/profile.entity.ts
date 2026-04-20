@@ -9,7 +9,7 @@ export const ProfileEntity = new Entity(
       userId: { type: "string", required: true },
       name: { type: "string", required: true },
       type: { type: ["adult", "child", "dog", "cat"] as const, required: true },
-      age: { type: "number" },
+      yearOfBirth: { type: "number" },
       notes: { type: "string" },
       likes: { type: "list", items: { type: "string" }, default: () => [] },
       dislikes: { type: "list", items: { type: "string" }, default: () => [] },

@@ -37,6 +37,9 @@ export async function uploadBuffer(key: string, buffer: Buffer, contentType: str
 }
 
 export function getObjectUrl(key: string): string {
-  if (isLocal) return `${process.env.S3_ENDPOINT}/${BUCKET}/${key}`;
+  if (isLocal) {
+    const publicBase = process.env.NEXT_PUBLIC_S3_PUBLIC_URL ?? process.env.S3_ENDPOINT;
+    return `${publicBase}/${BUCKET}/${key}`;
+  }
   return `https://${BUCKET}.s3.${process.env.S3_REGION ?? "eu-west-1"}.amazonaws.com/${key}`;
 }

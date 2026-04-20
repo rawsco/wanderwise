@@ -38,7 +38,7 @@ export default async function EditProfilePage({ params }: { params: Promise<{ pr
             defaultValues={{
               name: profile.name,
               type: profile.type,
-              age: profile.age,
+              yearOfBirth: profile.yearOfBirth,
               notes: profile.notes,
               likes: profile.likes ?? [],
               dislikes: profile.dislikes ?? [],

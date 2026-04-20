@@ -25,11 +25,15 @@ export default function LoginPage() {
   });
 
   async function onSubmit(data: FormValues) {
-    const result = await signIn("credentials", { ...data, redirect: false });
-    if (result?.error) {
-      setError("email", { message: "Invalid email or password" });
-    } else {
-      router.push("/trips");
+    try {
+      const result = await signIn("credentials", { ...data, redirect: false });
+      if (result?.error) {
+        setError("email", { message: "Invalid email or password" });
+      } else {
+        router.push("/trips");
+      }
+    } catch {
+      setError("email", { message: "Sign in failed — please try again" });
     }
   }
 

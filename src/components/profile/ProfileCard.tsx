@@ -8,14 +8,14 @@ interface ProfileCardProps {
   profileId: string;
   name: string;
   type: "adult" | "child" | "dog" | "cat";
-  age?: number;
+  yearOfBirth?: number;
   notes?: string;
   likes: string[];
   dislikes: string[];
   avatarMdUrl?: string | null;
 }
 
-export function ProfileCard({ profileId, name, type, age, notes, likes, dislikes, avatarMdUrl }: ProfileCardProps) {
+export function ProfileCard({ profileId, name, type, yearOfBirth, notes, likes, dislikes, avatarMdUrl }: ProfileCardProps) {
   return (
     <Card>
       <CardContent className="pt-5">
@@ -24,7 +24,7 @@ export function ProfileCard({ profileId, name, type, age, notes, likes, dislikes
             <Avatar name={name} type={type} src={avatarMdUrl} size="md" />
             <div>
               <p className="font-semibold text-gray-900">{name}</p>
-              <p className="text-xs text-gray-500 capitalize">{type}{age !== undefined ? `, age ${age}` : ""}</p>
+              <p className="text-xs text-gray-500 capitalize">{type}{yearOfBirth !== undefined ? `, born ${yearOfBirth}` : ""}</p>
             </div>
           </div>
           <Link href={`/profiles/${profileId}`}>

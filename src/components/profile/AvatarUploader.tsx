@@ -29,6 +29,7 @@ export function AvatarUploader({ profileId, name, type, currentSrc }: AvatarUplo
   const [rawDataUrl, setRawDataUrl] = useState<string | null>(null);
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const dragState = useRef<{ startX: number; startY: number; startTX: number; startTY: number } | null>(null);
 
@@ -66,44 +67,51 @@ export function AvatarUploader({ profileId, name, type, currentSrc }: AvatarUplo
   async function handleSave() {
     if (!rawDataUrl || !canvasRef.current) return;
     setUploading(true);
+    setError(null);
 
-    const img = new Image();
-    img.src = rawDataUrl;
-    await new Promise(res => { img.onload = res; });
+    try {
+      const img = new Image();
+      // Set onload before src — data URLs can resolve synchronously
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = rawDataUrl;
+      });
 
-    const canvas = canvasRef.current;
-    canvas.width = PREVIEW_SIZE;
-    canvas.height = PREVIEW_SIZE;
-    const ctx = canvas.getContext("2d")!;
+      const canvas = canvasRef.current;
+      canvas.width = PREVIEW_SIZE;
+      canvas.height = PREVIEW_SIZE;
+      const ctx = canvas.getContext("2d")!;
 
-    // Clip to circle
-    ctx.beginPath();
-    ctx.arc(PREVIEW_SIZE / 2, PREVIEW_SIZE / 2, PREVIEW_SIZE / 2, 0, Math.PI * 2);
-    ctx.clip();
+      ctx.beginPath();
+      ctx.arc(PREVIEW_SIZE / 2, PREVIEW_SIZE / 2, PREVIEW_SIZE / 2, 0, Math.PI * 2);
+      ctx.clip();
 
-    // Compute initial scale to fill the circle
-    const baseScale = Math.max(PREVIEW_SIZE / img.naturalWidth, PREVIEW_SIZE / img.naturalHeight);
-    const totalScale = baseScale * transform.scale;
+      const baseScale = Math.max(PREVIEW_SIZE / img.naturalWidth, PREVIEW_SIZE / img.naturalHeight);
+      const totalScale = baseScale * transform.scale;
+      const drawW = img.naturalWidth * totalScale;
+      const drawH = img.naturalHeight * totalScale;
+      const drawX = (PREVIEW_SIZE - drawW) / 2 + transform.x;
+      const drawY = (PREVIEW_SIZE - drawH) / 2 + transform.y;
 
-    const drawW = img.naturalWidth * totalScale;
-    const drawH = img.naturalHeight * totalScale;
-    const drawX = (PREVIEW_SIZE - drawW) / 2 + transform.x;
-    const drawY = (PREVIEW_SIZE - drawH) / 2 + transform.y;
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
 
-    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("Failed to export canvas");
 
-    canvas.toBlob(async blob => {
-      if (!blob) { setUploading(false); return; }
       const form = new FormData();
       form.append("photo", blob, "avatar.png");
       const res = await fetch(`/api/profiles/${profileId}/photo`, { method: "POST", body: form });
-      if (res.ok) {
-        const data = await res.json();
-        setSrc(data.avatarLg);
-        setRawDataUrl(null);
-      }
+      if (!res.ok) throw new Error("Upload failed");
+
+      const data = await res.json();
+      setSrc(data.avatarLg);
+      setRawDataUrl(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
       setUploading(false);
-    }, "image/png");
+    }
   }
 
   function handleCancel() {
@@ -162,6 +170,7 @@ export function AvatarUploader({ profileId, name, type, currentSrc }: AvatarUplo
               Cancel
             </Button>
           </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
         </>
       ) : (
         <>
