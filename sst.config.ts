@@ -166,6 +166,8 @@ export default $config({
         COGNITO_CLIENT_ID: userPoolClient.id,
         COGNITO_CLIENT_SECRET: userPoolClient.secret,
         COGNITO_ISSUER: cognitoIssuer,
+        NEXT_PUBLIC_COGNITO_DOMAIN: `wanderwise-${stage}.auth.${REGION}.amazoncognito.com`,
+        NEXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
         NEXTAUTH_URL: appUrl,
         NEXTAUTH_SECRET: nextAuthSecret.value,
       },

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { MapPin, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { signOutFully } from "@/lib/cognito-signout";
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -24,7 +25,7 @@ export function Navbar() {
               <>
                 <Link href="/trips" className="text-sm text-gray-600 hover:text-gray-900">My Trips</Link>
                 <Link href="/profiles" className="text-sm text-gray-600 hover:text-gray-900">Group</Link>
-                <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/" })}>
+                <Button variant="outline" size="sm" onClick={() => signOutFully()}>
                   Sign out
                 </Button>
               </>
@@ -46,7 +47,7 @@ export function Navbar() {
               <>
                 <Link href="/trips" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>My Trips</Link>
                 <Link href="/profiles" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>Group</Link>
-                <button type="button" className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
+                <button type="button" className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOutFully()}>Sign out</button>
               </>
             ) : (
               <Link href="/login" className="flex items-center text-sm text-emerald-600 font-medium py-3 px-1" onClick={() => setOpen(false)}>Sign in</Link>
