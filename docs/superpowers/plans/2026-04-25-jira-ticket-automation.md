@@ -30,8 +30,18 @@ This is non-negotiable: `set -e` exits on any failed command, `-u` errors on uns
 
 **Real Jira interaction during validation.** Tasks 3 and 4 require a real Atlassian credential and a real (or sandbox) ticket to validate against. The implementer will need access to:
 - A Jira project with at least one open ticket they can read.
-- An API token with read+write scopes on that project.
+- An API token with read+write scopes on that project, created at https://id.atlassian.com/manage-profile/security/api-tokens **while logged in as the workspace user** (the token is bound to the account that creates it; using it with a different email will 401).
 - A throwaway "test" ticket they can post comments to without disrupting work.
+
+The env file at `~/.config/claude/atlassian.env` must contain:
+
+```
+ATLASSIAN_SITE_NAME=<workspace-subdomain>
+ATLASSIAN_USER_EMAIL=<email>
+ATLASSIAN_API_TOKEN=<token>
+```
+
+These are the names the MCP server expects. `ATLASSIAN_SITE_NAME` is the subdomain (e.g. `devotonomy`), not the full URL.
 
 If the implementer doesn't have these, do not skip validation — report BLOCKED and let the controller provide credentials.
 

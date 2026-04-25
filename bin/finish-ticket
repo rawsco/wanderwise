@@ -38,6 +38,13 @@ if [ -d "$WORKTREE_DIR" ]; then
 fi
 
 # --- Delete the local branch ---
-git branch -D "$TICKET_LOWER" 2>/dev/null || true
+# Use -d (safe) when not forcing — git refuses if the branch is unmerged,
+# which is a useful second check on top of the origin/main fetch above.
+# With --force, fall back to -D to actually clean up an unmerged branch.
+if [ "$FORCE" = "--force" ]; then
+  git branch -D "$TICKET_LOWER" 2>/dev/null || true
+else
+  git branch -d "$TICKET_LOWER" 2>/dev/null || true
+fi
 
 echo "Cleaned up $TICKET (worktree, docker stack, local branch)."

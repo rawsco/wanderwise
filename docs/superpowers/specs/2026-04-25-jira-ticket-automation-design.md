@@ -195,10 +195,11 @@ Before this is functional, the user must:
 2. Create an Atlassian API token at https://id.atlassian.com/manage-profile/security/api-tokens.
 3. Create `~/.config/claude/atlassian.env` containing:
    ```
-   JIRA_URL=https://<workspace>.atlassian.net
-   JIRA_EMAIL=<email>
-   JIRA_API_TOKEN=<token>
+   ATLASSIAN_SITE_NAME=<workspace-subdomain>
+   ATLASSIAN_USER_EMAIL=<email>
+   ATLASSIAN_API_TOKEN=<token>
    ```
+   `ATLASSIAN_SITE_NAME` is just the subdomain (e.g. `devotonomy`), not the full URL — that's what the `@aashari/mcp-server-atlassian-jira` MCP server expects. `chmod 600` the file so it's not world-readable.
 4. Tell us the project key prefix (e.g. `WAN`) and the exact Jira workflow transition names to use for "in review" and "blocked / needs info." If unset, the orchestrator falls back to posting comments only (no transitions).
 
 These four items are gathered during the implementation phase, not the design phase.

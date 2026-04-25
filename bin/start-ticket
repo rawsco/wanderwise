@@ -31,6 +31,17 @@ ATLASSIAN_ENV="$HOME/.config/claude/atlassian.env"
   echo "missing $ATLASSIAN_ENV — see plan task 1" >&2; exit 1; }
 set -a; . "$ATLASSIAN_ENV"; set +a
 
+# The atlassian-jira MCP server expects ATLASSIAN_* names. Validate after
+# sourcing — a malformed env file (missing names, typos) otherwise produces
+# silent 401s on every Jira call rather than a clear setup error.
+for var in ATLASSIAN_SITE_NAME ATLASSIAN_USER_EMAIL ATLASSIAN_API_TOKEN; do
+  if [ -z "${!var:-}" ]; then
+    echo "missing $var in $ATLASSIAN_ENV" >&2
+    echo "expected lines: ATLASSIAN_SITE_NAME=<subdomain>, ATLASSIAN_USER_EMAIL=<email>, ATLASSIAN_API_TOKEN=<token>" >&2
+    exit 1
+  fi
+done
+
 # --- Source libs ---
 . "$BIN_DIR/lib/ports.sh"
 
@@ -106,36 +117,32 @@ if [ -f .env.local.example ]; then
 fi
 
 # --- BRIEF.md ---
+# Build the file with `printf '%s'` per field so $SUMMARY/$DESCRIPTION/$URL
+# (which come from arbitrary Jira ticket content) cannot be reinterpreted
+# as shell — `$(...)` or backticks in a ticket description otherwise execute
+# at script runtime via the heredoc.
 ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
-cat > "$WORKTREE_DIR/BRIEF.md" <<BRIEF
-# $TICKET — $SUMMARY
-
-**Mode:** autonomous; refuse-back to Jira if ambiguous.
-
-**URL:** $URL
-
-**Worktree:** $ABS_WORKTREE
-**Branch:** $TICKET_LOWER
-**Compose project:** $PROJECT_NAME
-
-**Ports allocated:**
-- Next.js dev: $NEXT_PORT
-- DynamoDB: $DDB_PORT
-- MinIO API: $MINIO_API_PORT
-- MinIO Console: $MINIO_CONSOLE_PORT
-
-## Ticket description
-
-$DESCRIPTION
-
-## To run the local stack
-
-\`\`\`bash
-docker compose --env-file .env.compose -p $PROJECT_NAME \\
-  -f docker-compose.yml -f .docker/compose.override.yml up -d
-npm run dev -- -p $NEXT_PORT
-\`\`\`
-BRIEF
+{
+  printf '# %s — %s\n\n' "$TICKET" "$SUMMARY"
+  printf '**Mode:** autonomous; refuse-back to Jira if ambiguous.\n\n'
+  printf '**URL:** %s\n\n' "$URL"
+  printf '**Worktree:** %s\n' "$ABS_WORKTREE"
+  printf '**Branch:** %s\n' "$TICKET_LOWER"
+  printf '**Compose project:** %s\n\n' "$PROJECT_NAME"
+  printf '**Ports allocated:**\n'
+  printf -- '- Next.js dev: %s\n' "$NEXT_PORT"
+  printf -- '- DynamoDB: %s\n' "$DDB_PORT"
+  printf -- '- MinIO API: %s\n' "$MINIO_API_PORT"
+  printf -- '- MinIO Console: %s\n\n' "$MINIO_CONSOLE_PORT"
+  printf '## Ticket description\n\n'
+  printf '%s\n\n' "$DESCRIPTION"
+  printf '## To run the local stack\n\n'
+  printf '```bash\n'
+  printf 'docker compose --env-file .env.compose -p %s \\\n' "$PROJECT_NAME"
+  printf '  -f docker-compose.yml -f .docker/compose.override.yml up -d\n'
+  printf 'npm run dev -- -p %s\n' "$NEXT_PORT"
+  printf '```\n'
+} > "$WORKTREE_DIR/BRIEF.md"
 
 # --- Print summary ---
 trap - ERR
