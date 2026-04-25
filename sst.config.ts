@@ -22,7 +22,14 @@ export default $config({
       protect: ["production"].includes(input?.stage ?? ""),
       home: "aws",
       providers: {
-        aws: { region: REGION, profile: "wanderwise" },
+        // Locally we authenticate via the `wanderwise` SSO profile. In CI
+        // (GitHub Actions) credentials are injected as env vars by
+        // aws-actions/configure-aws-credentials and there is no profile —
+        // the SDK picks them up automatically when no profile is set.
+        aws: {
+          region: REGION,
+          ...(process.env.CI ? {} : { profile: "wanderwise" }),
+        },
       },
     };
   },
