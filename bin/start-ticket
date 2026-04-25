@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# bin/start-ticket — spin up an isolated workspace for a Jira ticket.
+#
+# Usage: bin/start-ticket <TICKET-KEY>
+#
+# Creates a git worktree in ../wanderwise-<TICKET>, allocates dynamic host
+# ports, writes a per-worktree compose override and .env.local, generates
+# a BRIEF.md, and prints instructions for starting the autonomous Claude
+# session.
+set -euo pipefail
+
+# --- Args ---
+[ $# -eq 1 ] || { echo "Usage: $0 <TICKET-KEY>" >&2; exit 2; }
+TICKET="$1"
+
+# --- Paths ---
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$BIN_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
+# --- Pre-flight ---
+for cmd in gh docker jq claude git nc; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "missing required command: $cmd" >&2; exit 1; }
+done
+docker info >/dev/null 2>&1 || {
+  echo "Docker daemon is not running" >&2; exit 1; }
+
+ATLASSIAN_ENV="$HOME/.config/claude/atlassian.env"
+[ -f "$ATLASSIAN_ENV" ] || {
+  echo "missing $ATLASSIAN_ENV — see plan task 1" >&2; exit 1; }
+set -a; . "$ATLASSIAN_ENV"; set +a
+
+# --- Source libs ---
+. "$BIN_DIR/lib/ports.sh"
+
+# --- Fetch ticket ---
+echo "Fetching $TICKET from Jira..."
+TICKET_JSON=$("$BIN_DIR/lib/jira.sh" fetch "$TICKET")
+
+SUMMARY=$(echo "$TICKET_JSON" | jq -r .summary)
+DESCRIPTION=$(echo "$TICKET_JSON" | jq -r .description)
+STATUS=$(echo "$TICKET_JSON" | jq -r .status)
+URL=$(echo "$TICKET_JSON" | jq -r .url)
+
+if [ "$STATUS" = "Done" ] || [ "$STATUS" = "Closed" ]; then
+  echo "Ticket $TICKET is $STATUS — refusing to start work." >&2
+  exit 1
+fi
+if [ -z "$DESCRIPTION" ] || [ "$DESCRIPTION" = "null" ]; then
+  echo "Ticket $TICKET has no description — refusing." >&2
+  exit 1
+fi
+
+# --- Allocate ports ---
+PORTS_OUTPUT=$(allocate_workspace_ports)
+DDB_PORT=$(echo "$PORTS_OUTPUT" | grep ^DDB_PORT= | cut -d= -f2)
+MINIO_API_PORT=$(echo "$PORTS_OUTPUT" | grep ^MINIO_API_PORT= | cut -d= -f2)
+MINIO_CONSOLE_PORT=$(echo "$PORTS_OUTPUT" | grep ^MINIO_CONSOLE_PORT= | cut -d= -f2)
+NEXT_PORT=$(echo "$PORTS_OUTPUT" | grep ^NEXT_PORT= | cut -d= -f2)
+
+# --- Worktree ---
+TICKET_LOWER=$(echo "$TICKET" | tr '[:upper:]' '[:lower:]')
+WORKTREE_DIR="../wanderwise-$TICKET"
+PROJECT_NAME="wanderwise-$TICKET_LOWER"
+
+cleanup_partial() {
+  if [ -d "$WORKTREE_DIR" ]; then
+    git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
+  fi
+  git branch -D "$TICKET_LOWER" 2>/dev/null || true
+}
+trap cleanup_partial ERR
+
+git worktree add "$WORKTREE_DIR" -b "$TICKET_LOWER"
+
+# --- Compose override ---
+mkdir -p "$WORKTREE_DIR/.docker"
+cat > "$WORKTREE_DIR/.docker/compose.override.yml" <<YAML
+services:
+  dynamodb-local:
+    ports:
+      - "${DDB_PORT}:8000"
+  minio:
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+YAML
+
+cat > "$WORKTREE_DIR/.env.compose" <<ENV
+DDB_PORT=$DDB_PORT
+MINIO_API_PORT=$MINIO_API_PORT
+MINIO_CONSOLE_PORT=$MINIO_CONSOLE_PORT
+ENV
+
+# --- .env.local seeded with per-worktree ports ---
+if [ -f .env.local.example ]; then
+  cp .env.local.example "$WORKTREE_DIR/.env.local"
+  # Substitute defaults to dynamic ports.
+  sed -i.bak \
+    -e "s|http://localhost:8000|http://localhost:$DDB_PORT|g" \
+    -e "s|http://localhost:9002|http://localhost:$MINIO_API_PORT|g" \
+    -e "s|http://localhost:3000|http://localhost:$NEXT_PORT|g" \
+    "$WORKTREE_DIR/.env.local"
+  rm -f "$WORKTREE_DIR/.env.local.bak"
+fi
+
+# --- BRIEF.md ---
+ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
+cat > "$WORKTREE_DIR/BRIEF.md" <<BRIEF
+# $TICKET — $SUMMARY
+
+**Mode:** autonomous; refuse-back to Jira if ambiguous.
+
+**URL:** $URL
+
+**Worktree:** $ABS_WORKTREE
+**Branch:** $TICKET_LOWER
+**Compose project:** $PROJECT_NAME
+
+**Ports allocated:**
+- Next.js dev: $NEXT_PORT
+- DynamoDB: $DDB_PORT
+- MinIO API: $MINIO_API_PORT
+- MinIO Console: $MINIO_CONSOLE_PORT
+
+## Ticket description
+
+$DESCRIPTION
+
+## To run the local stack
+
+\`\`\`bash
+docker compose --env-file .env.compose -p $PROJECT_NAME \\
+  -f docker-compose.yml -f .docker/compose.override.yml up -d
+npm run dev -- -p $NEXT_PORT
+\`\`\`
+BRIEF
+
+# --- Print summary ---
+trap - ERR
+cat <<SUMMARY
+
+Workspace ready for $TICKET ($SUMMARY)
+
+  Worktree:        $ABS_WORKTREE
+  Branch:          $TICKET_LOWER
+  Compose project: $PROJECT_NAME
+
+  Next.js dev:     http://localhost:$NEXT_PORT
+  DynamoDB:        http://localhost:$DDB_PORT
+  MinIO API:       http://localhost:$MINIO_API_PORT
+  MinIO Console:   http://localhost:$MINIO_CONSOLE_PORT
+
+Next:
+  cd $WORKTREE_DIR
+  claude
+  /ticket-work
+
+SUMMARY
