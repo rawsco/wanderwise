@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
   allowedDevOrigins: ["192.168.50.20"],
+  serverExternalPackages: ["sharp"],
 };
 
 export default nextConfig;
