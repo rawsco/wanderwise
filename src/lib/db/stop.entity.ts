@@ -22,6 +22,7 @@ export const StopEntity = new Entity(
       notes: { type: "any" },
       summary: { type: "string" },
       summaryGeneratedAt: { type: "string" },
+      summaryHash: { type: "string" },
       createdAt: { type: "string", default: () => new Date().toISOString() },
     },
     indexes: {

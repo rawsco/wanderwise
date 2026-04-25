@@ -324,11 +324,9 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
             ) : (
               <div className="py-6 text-center">
                 <Sparkles className="h-8 w-8 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm text-gray-500 mb-3">Get an AI-generated overview of this stop, tailored to your travel group.</p>
-                <Button onClick={generateSummary} size="sm" className="h-9">
-                  <Sparkles className="h-4 w-4 mr-1.5" />
-                  Generate summary
-                </Button>
+                <p className="text-sm text-gray-500">
+                  A summary will appear here once you&apos;ve added arrival dates or notes for this stop.
+                </p>
               </div>
             )}
             {summaryError && (

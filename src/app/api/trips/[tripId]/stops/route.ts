@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { requireAuth } from "@/lib/auth-helpers";
 import { StopEntity } from "@/lib/db/stop.entity";
 import { TripEntity } from "@/lib/db/trip.entity";
+import { refreshSummaryIfStale } from "@/lib/stops";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -68,6 +69,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ tripId:
       kind: "intermediate",
       ...data,
     }).go();
+
+    await refreshSummaryIfStale(tripId, stopId);
 
     return NextResponse.json(
       { stopId, tripId, order, kind: "intermediate", ...data },
