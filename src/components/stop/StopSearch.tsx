@@ -51,8 +51,10 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  defaultArrivalRef.current = defaultArrivalDate;
-  tripEndRef.current = tripEndDate;
+  useEffect(() => {
+    defaultArrivalRef.current = defaultArrivalDate;
+    tripEndRef.current = tripEndDate;
+  });
 
   // The search input is conditionally rendered based on `pending` —
   // when the user picks a place, the input unmounts and the confirm

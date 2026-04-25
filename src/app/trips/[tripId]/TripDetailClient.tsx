@@ -122,6 +122,7 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
     const stored = localStorage.getItem(PANEL_STORAGE_KEY);
     if (!stored) return;
     const n = parseInt(stored, 10);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time post-mount hydration from localStorage; using a lazy initializer would cause an SSR/CSR mismatch.
     if (Number.isFinite(n)) setPanelWidth(Math.max(PANEL_MIN, Math.min(PANEL_MAX, n)));
   }, []);
 

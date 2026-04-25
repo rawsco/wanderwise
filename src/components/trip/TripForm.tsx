@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +150,7 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
         {profiles.length === 0 ? (
           <p className="text-xs text-gray-400">
             No profiles yet.{" "}
-            <a href="/profiles/new" className="text-emerald-600 hover:underline">Add your travelling group</a> first.
+            <Link href="/profiles/new" className="text-emerald-600 hover:underline">Add your travelling group</Link> first.
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
