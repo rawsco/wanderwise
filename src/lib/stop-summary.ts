@@ -49,6 +49,6 @@ export async function generateStopSummary(input: StopSummaryInput): Promise<stri
       { role: "user", content: lines.join("\n") },
     ],
     temperature: 0.2,
-    maxTokens: 120,
+    maxTokens: 200,
   });
 }
