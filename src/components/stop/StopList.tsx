@@ -328,18 +328,28 @@ function StopItem({
       </div>
 
       <div className="flex items-center gap-0.5 flex-shrink-0">
-        {!isStart && !isEnd && (
+        {isStart || isEnd ? (
           <Link
-            href={`/trips/${stop.tripId}/stops/${stop.stopId}`}
-            aria-label={`Manage ${stop.name}`}
+            href={`/trips/${stop.tripId}/edit`}
+            aria-label={`Edit ${isStart ? "start" : "end"} location`}
             className="h-11 w-11 lg:h-8 lg:w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-accent transition-colors"
           >
-            <ArrowRight className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+            <Pencil className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
           </Link>
+        ) : (
+          <>
+            <Link
+              href={`/trips/${stop.tripId}/stops/${stop.stopId}`}
+              aria-label={`Manage ${stop.name}`}
+              className="h-11 w-11 lg:h-8 lg:w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-accent transition-colors"
+            >
+              <ArrowRight className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+            </Link>
+            <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8 text-red-400 hover:text-red-600" onClick={() => onRemove(stop.stopId)}>
+              <Trash2 className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+            </Button>
+          </>
         )}
-        <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8 text-red-400 hover:text-red-600" onClick={() => onRemove(stop.stopId)}>
-          <Trash2 className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-        </Button>
       </div>
     </div>
   );

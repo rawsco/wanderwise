@@ -54,8 +54,15 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
   defaultArrivalRef.current = defaultArrivalDate;
   tripEndRef.current = tripEndDate;
 
+  // The search input is conditionally rendered based on `pending` —
+  // when the user picks a place, the input unmounts and the confirm
+  // card shows; on save it remounts. Re-attach the autocomplete each
+  // time the input mounts, otherwise the second search session has
+  // no listener.
+  const inputMounted = !pending;
+
   useEffect(() => {
-    if (!placesLib || !inputRef.current) return;
+    if (!placesLib || !inputMounted || !inputRef.current) return;
 
     const autocomplete = new placesLib.Autocomplete(inputRef.current, {
       fields: ["name", "formatted_address", "geometry", "place_id"],
@@ -89,7 +96,7 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
       google.maps.event.removeListener(listener);
       google.maps.event.clearInstanceListeners(autocomplete);
     };
-  }, [placesLib]);
+  }, [placesLib, inputMounted]);
 
   function clearPending() {
     setPending(null);

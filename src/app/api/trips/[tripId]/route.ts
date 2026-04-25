@@ -4,12 +4,22 @@ import { requireAuth } from "@/lib/auth-helpers";
 import { TripEntity } from "@/lib/db/trip.entity";
 import { StopEntity } from "@/lib/db/stop.entity";
 
+const anchorSchema = z.object({
+  name: z.string().min(1),
+  address: z.string().min(1),
+  lat: z.number(),
+  lng: z.number(),
+  placeId: z.string().optional(),
+});
+
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   memberIds: z.array(z.string()).optional(),
+  startLocation: anchorSchema.optional(),
+  endLocation: anchorSchema.optional(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ tripId: string }> }) {
@@ -48,8 +58,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ tripId
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // Trip table only stores trip metadata — strip the anchor location
+    // payloads before persisting trip fields; anchor stops are updated
+    // separately below.
+    const { startLocation, endLocation, ...tripPatch } = data;
     await TripEntity.update({ userId: user.id, tripId })
-      .set({ ...data, updatedAt: new Date().toISOString() })
+      .set({ ...tripPatch, updatedAt: new Date().toISOString() })
       .go();
 
     // Trip-level changes invalidate every stop's cached summary so the
@@ -59,7 +73,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ tripId
     const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
     const stopUpdates: Promise<unknown>[] = [];
     for (const stop of stopsResult.data) {
-      const setFields: Record<string, string> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const setFields: Record<string, any> = {};
       let touched = false;
 
       // Propagate trip date changes to the anchor stops' arrivalDate.
@@ -69,6 +84,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ tripId
       }
       if (stop.kind === "end" && data.endDate && stop.arrivalDate !== data.endDate) {
         setFields.arrivalDate = data.endDate;
+        touched = true;
+      }
+
+      // Apply anchor location changes from the trip edit form.
+      if (stop.kind === "start" && startLocation) {
+        Object.assign(setFields, startLocation);
+        touched = true;
+      }
+      if (stop.kind === "end" && endLocation) {
+        Object.assign(setFields, endLocation);
         touched = true;
       }
 

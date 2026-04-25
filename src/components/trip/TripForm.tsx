@@ -38,7 +38,11 @@ const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "
 
 interface TripFormProps {
   tripId?: string;
-  defaultValues?: Partial<FormValues & { memberIds: string[] }>;
+  defaultValues?: Partial<FormValues & {
+    memberIds: string[];
+    startLocation: Anchor;
+    endLocation: Anchor;
+  }>;
   profiles: Profile[];
 }
 
@@ -54,8 +58,8 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
   const router = useRouter();
   const isEdit = Boolean(tripId);
   const [memberIds, setMemberIds] = useState<string[]>(defaultValues?.memberIds ?? []);
-  const [startLocation, setStartLocation] = useState<Anchor | null>(null);
-  const [endLocation, setEndLocation] = useState<Anchor | null>(null);
+  const [startLocation, setStartLocation] = useState<Anchor | null>(defaultValues?.startLocation ?? null);
+  const [endLocation, setEndLocation] = useState<Anchor | null>(defaultValues?.endLocation ?? null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
@@ -71,7 +75,7 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
   async function onSubmit(data: FormValues) {
     setSubmitError(null);
 
-    if (!isEdit && (!startLocation || !endLocation)) {
+    if (!startLocation || !endLocation) {
       setSubmitError("Pick both a start and an end location.");
       return;
     }
@@ -82,9 +86,7 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
 
     const url = tripId ? `/api/trips/${tripId}` : "/api/trips";
     const method = tripId ? "PATCH" : "POST";
-    const body = isEdit
-      ? { ...data, memberIds }
-      : { ...data, memberIds, startLocation, endLocation };
+    const body = { ...data, memberIds, startLocation, endLocation };
 
     const res = await fetch(url, {
       method,
@@ -129,22 +131,18 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
         </div>
       </div>
 
-      {!isEdit && (
-        <>
-          <AnchorPicker
-            label="Start location"
-            placeholder="Where does the trip begin?"
-            value={startLocation}
-            onChange={setStartLocation}
-          />
-          <AnchorPicker
-            label="End location"
-            placeholder="Where does the trip end?"
-            value={endLocation}
-            onChange={setEndLocation}
-          />
-        </>
-      )}
+      <AnchorPicker
+        label="Start location"
+        placeholder="Where does the trip begin?"
+        value={startLocation}
+        onChange={setStartLocation}
+      />
+      <AnchorPicker
+        label="End location"
+        placeholder="Where does the trip end?"
+        value={endLocation}
+        onChange={setEndLocation}
+      />
 
       <div className="space-y-1.5">
         <Label>Who&apos;s coming?</Label>
@@ -196,8 +194,14 @@ function AnchorPicker({ label, placeholder, value, onChange }: AnchorPickerProps
   const placesLib = useMapsLibrary("places");
   const [inputValue, setInputValue] = useState("");
 
+  // Re-attach autocomplete each time the input mounts (it only mounts
+  // when `value` is null — the selected-place card replaces it
+  // otherwise, so the input is unmounted and the listener would be
+  // stale on remount).
+  const inputMounted = value === null;
+
   useEffect(() => {
-    if (!placesLib || !inputRef.current) return;
+    if (!placesLib || !inputMounted || !inputRef.current) return;
 
     const autocomplete = new placesLib.Autocomplete(inputRef.current, {
       fields: ["name", "formatted_address", "geometry", "place_id"],
@@ -220,7 +224,7 @@ function AnchorPicker({ label, placeholder, value, onChange }: AnchorPickerProps
       google.maps.event.removeListener(listener);
       google.maps.event.clearInstanceListeners(autocomplete);
     };
-  }, [placesLib, onChange]);
+  }, [placesLib, inputMounted, onChange]);
 
   return (
     <div className="space-y-1.5">
