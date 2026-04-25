@@ -32,14 +32,26 @@ export async function POST(
     if (!stop || !trip) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const memberIds = trip.memberIds ?? [];
-    let members: { name: string; type: string; yearOfBirth?: number }[] = [];
+    let members: {
+      name: string;
+      type: string;
+      yearOfBirth?: number;
+      likes?: string[];
+      dislikes?: string[];
+    }[] = [];
     if (memberIds.length > 0) {
       const profilesResult = await ProfileEntity.query.byUser({ userId: user.id }).go();
       const profileMap = Object.fromEntries(profilesResult.data.map(p => [p.profileId, p]));
       members = memberIds
         .map(id => profileMap[id])
         .filter(Boolean)
-        .map(p => ({ name: p.name, type: p.type, yearOfBirth: p.yearOfBirth }));
+        .map(p => ({
+          name: p.name,
+          type: p.type,
+          yearOfBirth: p.yearOfBirth,
+          likes: p.likes,
+          dislikes: p.dislikes,
+        }));
     }
 
     const nights = stop.arrivalDate && stop.departureDate

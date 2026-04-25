@@ -10,56 +10,68 @@ export interface StopSummaryInput {
   nights?: number;
   bookingStatus?: "enquiry" | "pending" | "confirmed";
   notes?: { text: string; createdAt: string }[];
-  members?: { name: string; type: string; yearOfBirth?: number }[];
+  members?: {
+    name: string;
+    type: string;
+    yearOfBirth?: number;
+    likes?: string[];
+    dislikes?: string[];
+  }[];
 }
 
-const BOOKING_SYSTEM = `You are a travel advisor briefing your client on where their stop currently stands. Write as flowing prose — two or three short paragraphs — the way you'd talk them through it over a coffee. Never use bullet points, lists, markdown, headings, or dashes to separate items. Weave the facts into sentences.
+const SYSTEM_PROMPT = `You restate a road-trip stop's booking facts in one short paragraph.
 
-Open with what's booked and when, folding the dates, nights, check-in and check-out times naturally into the prose. If the booking is still an enquiry or pending, say so plainly and nudge them to confirm; if it's confirmed, reassure them it's locked in.
+You know NOTHING about this place beyond what is written under FACTS. The name and address are labels — they tell you nothing about the building, scenery, area, weather, or what is nearby. Adjectives like "charming", "cosy", "rustic", "scenic", "Highland", "peaceful" are banned. Words like "views", "fireplace", "trails", "countryside", "retreat" are banned. Phrases like "perfect base", "sense of adventure", "unwind", "explore nearby" are banned.
 
-Work the traveller's own notes into the narrative — pitch numbers, confirmation references, contact names, arrival instructions — as established fact. Don't contradict them, don't introduce them with "the notes say", just speak as though you know.
+Allowed content — ONLY:
+- the stop name (as a name, not a description)
+- the dates, check-in/out times, nights
+- the booking status (note if not confirmed)
+- the traveller's own notes — restate as fact
+- named members with their supplied likes/dislikes (one short reference, only if relevant)
 
-If the group includes children, dogs, or cats, work their needs in naturally in a sentence. Close with a short, confident line of colour about the place itself — only if you actually know it. Keep the whole thing under 180 words, friendly and conversational, and skip any "Here is a summary" preamble.`;
+Output one short paragraph. Maximum 80 words. Plain prose. No markdown. No preamble. No closing pleasantry.
 
-const LOCATION_SYSTEM = `You are a friendly, practical campervan trip planning assistant.
-Given a stop on a UK/European road trip, write a short summary for motorhome travellers.
+EXAMPLE
 
-Guidelines:
-- Keep the total under 200 words.
-- Use plain text with short paragraphs separated by blank lines — no markdown headings or bullets.
-- Start with a one-sentence character sketch of the location.
-- Mention what's nearby and worth doing.
-- Include any practical motorhome-relevant notes (parking, hookup, dump points) only if well-known. Do not invent facts.
-- If the travel group includes dogs, children, or pets, tailor one sentence to them.
-- Friendly, conversational tone. No headings, no "Here is a summary" preamble.`;
+FACTS
+Stop name: Ardrhu House
+Address: Onich, Fort William, Scotland
+Arriving: 2025-05-05 (check in 15:00)
+Departing: 2025-05-08 (check out 11:00)
+Staying: 3 nights
+Booking status: confirmed
 
-function describeMembers(members?: StopSummaryInput["members"]): string {
-  if (!members || members.length === 0) return "";
+Travelling group:
+- Ross (adult, age 42)
+
+GOOD output:
+Ardrhu House is confirmed for three nights, 5–8 May, with check-in at 15:00 on the 5th and check-out at 11:00 on the 8th. Ross is the only one staying.
+
+BAD output (do not do this):
+Your cozy stay at Ardrhu House in the heart of Fort William is confirmed for three nights. Nestled in the Highlands with sweeping views, it's the perfect base for exploring Ben Nevis. (Banned: "cozy", "heart of", "Nestled", "Highlands", "sweeping views", "perfect base", "exploring Ben Nevis" — none of that is in FACTS.)`;
+
+function describeMembers(members?: StopSummaryInput["members"]): string[] {
+  if (!members || members.length === 0) return [];
   const currentYear = new Date().getFullYear();
-  const parts = members.map(m => {
-    if (m.type === "dog") return `${m.name} (dog)`;
-    if (m.type === "cat") return `${m.name} (cat)`;
-    if (m.yearOfBirth) return `${m.name} (${m.type}, age ${currentYear - m.yearOfBirth})`;
-    return `${m.name} (${m.type})`;
-  });
-  return `Travelling with: ${parts.join(", ")}.`;
-}
-
-function hasBookingDetails(input: StopSummaryInput): boolean {
-  return Boolean(
-    input.departureDate ||
-    input.checkInTime ||
-    input.checkOutTime ||
-    input.bookingStatus ||
-    (input.notes && input.notes.length > 0)
-  );
+  const lines: string[] = ["Travelling group:"];
+  for (const m of members) {
+    let header: string;
+    if (m.type === "dog") header = `- ${m.name} (dog)`;
+    else if (m.type === "cat") header = `- ${m.name} (cat)`;
+    else if (m.yearOfBirth) header = `- ${m.name} (${m.type}, age ${currentYear - m.yearOfBirth})`;
+    else header = `- ${m.name} (${m.type})`;
+    lines.push(header);
+    if (m.likes && m.likes.length > 0) lines.push(`    likes: ${m.likes.join(", ")}`);
+    if (m.dislikes && m.dislikes.length > 0) lines.push(`    dislikes: ${m.dislikes.join(", ")}`);
+  }
+  return lines;
 }
 
 export async function generateStopSummary(input: StopSummaryInput): Promise<string> {
-  const bookingFocused = hasBookingDetails(input);
-
   const lines = [
-    `Stop: ${input.name}`,
+    "FACTS",
+    `Stop name: ${input.name}`,
     `Address: ${input.address}`,
   ];
   if (input.arrivalDate) lines.push(`Arriving: ${input.arrivalDate}${input.checkInTime ? ` (check in ${input.checkInTime})` : ""}`);
@@ -68,23 +80,23 @@ export async function generateStopSummary(input: StopSummaryInput): Promise<stri
   if (input.bookingStatus) lines.push(`Booking status: ${input.bookingStatus}`);
 
   if (input.notes && input.notes.length > 0) {
-    lines.push("", "Traveller's own notes (treat as fact):");
+    lines.push("", "Traveller's own notes (verbatim facts):");
     for (const n of input.notes) {
       lines.push(`- ${n.text.replace(/\s+/g, " ").trim()}`);
     }
   }
 
-  const membersLine = describeMembers(input.members);
-  if (membersLine) lines.push("", membersLine);
+  const memberLines = describeMembers(input.members);
+  if (memberLines.length > 0) lines.push("", ...memberLines);
 
-  lines.push("", "Write the summary now.");
+  lines.push("", "Write the summary now using ONLY the facts above. Anything not above is unknown to you.");
 
   return generateText({
     messages: [
-      { role: "system", content: bookingFocused ? BOOKING_SYSTEM : LOCATION_SYSTEM },
+      { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: lines.join("\n") },
     ],
-    temperature: 0.7,
-    maxTokens: 500,
+    temperature: 0.2,
+    maxTokens: 400,
   });
 }
