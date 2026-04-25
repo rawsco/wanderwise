@@ -48,3 +48,9 @@ next-env.d.ts
 
 # open-next
 .open-next
+
+# Per-worktree dev-stack overrides created by bin/start-ticket.
+# Each worktree carries its own values; they are intentionally local-only.
+.docker/
+.env.compose
+BRIEF.md

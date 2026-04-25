@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# bin/finish-ticket — tear down a ticket workspace after its PR has been merged.
+#
+# Usage: bin/finish-ticket <TICKET-KEY> [--force]
+set -euo pipefail
+
+[ $# -ge 1 ] || { echo "Usage: $0 <TICKET-KEY> [--force]" >&2; exit 2; }
+TICKET="$1"
+FORCE="${2:-}"
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR"
+
+TICKET_LOWER=$(echo "$TICKET" | tr '[:upper:]' '[:lower:]')
+WORKTREE_DIR="../wanderwise-$TICKET"
+PROJECT_NAME="wanderwise-$TICKET_LOWER"
+
+# --- Refuse if branch is not merged into main, unless --force ---
+if [ "$FORCE" != "--force" ]; then
+  git fetch origin main >/dev/null 2>&1 || true
+  if ! git branch --merged origin/main 2>/dev/null | grep -q "^[ *]*$TICKET_LOWER\$"; then
+    echo "Branch $TICKET_LOWER is not merged into origin/main." >&2
+    echo "Re-run with --force to clean up anyway." >&2
+    exit 1
+  fi
+fi
+
+# --- Stop the docker stack ---
+if [ -f "$WORKTREE_DIR/.env.compose" ] && [ -f "$WORKTREE_DIR/.docker/compose.override.yml" ]; then
+  ( cd "$WORKTREE_DIR" && \
+    docker compose --env-file .env.compose -p "$PROJECT_NAME" \
+      -f docker-compose.yml -f .docker/compose.override.yml down -v ) || true
+fi
+
+# --- Remove the worktree ---
+if [ -d "$WORKTREE_DIR" ]; then
+  git worktree remove --force "$WORKTREE_DIR"
+fi
+
+# --- Delete the local branch ---
+# Use -d (safe) when not forcing — git refuses if the branch is unmerged,
+# which is a useful second check on top of the origin/main fetch above.
+# With --force, fall back to -D to actually clean up an unmerged branch.
+if [ "$FORCE" = "--force" ]; then
+  git branch -D "$TICKET_LOWER" 2>/dev/null || true
+else
+  git branch -d "$TICKET_LOWER" 2>/dev/null || true
+fi
+
+echo "Cleaned up $TICKET (worktree, docker stack, local branch)."
