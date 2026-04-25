@@ -51,8 +51,13 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  defaultArrivalRef.current = defaultArrivalDate;
-  tripEndRef.current = tripEndDate;
+  // No dep array: intentional. Keeps refs current with the latest props so
+  // the async place_changed listener (which closes over the refs, not the
+  // props) reads up-to-date values without re-binding the listener.
+  useEffect(() => {
+    defaultArrivalRef.current = defaultArrivalDate;
+    tripEndRef.current = tripEndDate;
+  });
 
   // The search input is conditionally rendered based on `pending` —
   // when the user picks a place, the input unmounts and the confirm

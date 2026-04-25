@@ -175,9 +175,20 @@ export default $config({
       },
     });
 
+    // ---- CI/CD: GitHub Actions OIDC role (staging only) ----
+    // Production tag-deploy is a planned follow-up and will need its own
+    // role with a different trust-policy `sub` condition.
+    let githubActionsRoleArn: $util.Output<string> | undefined;
+    if (stage === "staging") {
+      const { setupGitHubOidc } = await import("./infra/github-oidc");
+      const oidc = await setupGitHubOidc();
+      githubActionsRoleArn = oidc.roleArn;
+    }
+
     return {
       url: appUrl,
       cognitoIssuer,
+      ...(githubActionsRoleArn ? { githubActionsRoleArn } : {}),
     };
   },
 });

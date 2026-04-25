@@ -54,6 +54,7 @@ export function DatePicker({ value, onChange, min, max, disabledRanges = [], pla
   const minDate = parseISO(min);
   const maxDate = parseISO(max);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: gates portal rendering until after hydration so SSR markup matches.
   React.useEffect(() => setMounted(true), []);
 
   React.useLayoutEffect(() => {
