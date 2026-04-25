@@ -57,7 +57,9 @@ export default $config({
         })
       : undefined;
 
-    const media = isCloudStage ? new sst.aws.Bucket("Media") : undefined;
+    const media = isCloudStage
+      ? new sst.aws.Bucket("Media", { access: "public" })
+      : undefined;
 
     // ---- Auth (every stage gets its own Cognito pool) ----
     const userPool = new sst.aws.CognitoUserPool("UserPool", {

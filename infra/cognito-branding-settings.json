@@ -79,7 +79,7 @@
     },
     "pageBackground": {
       "image": {
-        "enabled": true
+        "enabled": false
       },
       "lightMode": {
         "color": "ffffffff"
