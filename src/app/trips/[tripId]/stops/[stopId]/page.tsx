@@ -37,8 +37,9 @@ export default async function StopDetailPage({
   const stopIndex = allStops.findIndex(s => s.stopId === stopId);
   const isStart = stopIndex === 0;
   const isEnd = stopIndex === allStops.length - 1 && allStops.length > 1;
-  const stopLabel = isStart ? "Departure point" : isEnd ? "Final destination" : `Stop ${stopIndex}`;
-  const labelColor = isStart ? "text-emerald-600 bg-emerald-50" : isEnd ? "text-gray-700 bg-gray-100" : "text-blue-600 bg-blue-50";
+  if (isStart || isEnd) redirect(`/trips/${tripId}`);
+  const stopLabel = `Stop ${stopIndex}`;
+  const labelColor = "text-blue-600 bg-blue-50";
 
   const contact = stop.placeId
     ? await getPlaceContact(stop.placeId)
@@ -80,8 +81,6 @@ export default async function StopDetailPage({
           checkOutTime: stop.checkOutTime,
           bookingStatus: stop.bookingStatus as "enquiry" | "pending" | "confirmed" | undefined,
         }}
-        isStart={isStart}
-        isEnd={isEnd}
         initialNotes={notes}
         contact={contact}
         initialSummary={stop.summary}

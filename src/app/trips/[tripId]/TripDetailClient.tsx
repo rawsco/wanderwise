@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { TripMap } from "@/components/trip/TripMap";
 import { StopList } from "@/components/stop/StopList";
 import { StopSearch } from "@/components/stop/StopSearch";
 import { DriveSegments } from "@/components/stop/DriveSegments";
-import { Map, List } from "lucide-react";
+import { Map, List, GripVertical } from "lucide-react";
 import { sortStopsByDate } from "@/lib/stops";
+
+const PANEL_MIN = 260;
+const PANEL_MAX = 640;
+const PANEL_DEFAULT = 384;
+const PANEL_STORAGE_KEY = "wanderwise.tripPanelWidth";
 
 interface Stop {
   stopId: string;
@@ -48,6 +53,13 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
     return tripStartDate;
   }, [stops, tripStartDate]);
 
+  const bookedRanges = useMemo(() => {
+    const middle = stops.length > 2 ? stops.slice(1, -1) : [];
+    return middle
+      .filter(s => s.arrivalDate && s.departureDate)
+      .map(s => ({ from: s.arrivalDate!, to: s.departureDate! }));
+  }, [stops]);
+
   const handleStopAdded = useCallback((stop: Stop) => {
     setStops(prev => {
       const appended = [...prev, { ...stop, order: prev.length }];
@@ -67,30 +79,6 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
         return sortStopsByDate(updated);
       }
       return appended;
-    });
-  }, [tripId]);
-
-  const handleMove = useCallback(async (stopId: string, direction: "up" | "down") => {
-    setStops(prev => {
-      const idx = prev.findIndex(s => s.stopId === stopId);
-      if (idx === -1) return prev;
-      const next = [...prev];
-      const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
-      const updated = next.map((s, i) => ({ ...s, order: i }));
-
-      Promise.all([
-        fetch(`/api/trips/${tripId}/stops/${updated[idx].stopId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: idx }),
-        }),
-        fetch(`/api/trips/${tripId}/stops/${updated[targetIdx].stopId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: targetIdx }),
-        }),
-      ]);
-
-      return updated;
     });
   }, [tripId]);
 
@@ -142,6 +130,46 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
 
   const [mobileTab, setMobileTab] = useState<"route" | "map">("route");
 
+  const desktopContainerRef = useRef<HTMLDivElement>(null);
+  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(PANEL_STORAGE_KEY);
+    if (!stored) return;
+    const n = parseInt(stored, 10);
+    if (Number.isFinite(n)) setPanelWidth(Math.max(PANEL_MIN, Math.min(PANEL_MAX, n)));
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    function onMove(e: MouseEvent) {
+      const container = desktopContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const next = rect.right - e.clientX;
+      setPanelWidth(Math.max(PANEL_MIN, Math.min(PANEL_MAX, next)));
+    }
+    function onUp() {
+      setDragging(false);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [dragging]);
+
+  useEffect(() => {
+    if (dragging) return;
+    localStorage.setItem(PANEL_STORAGE_KEY, String(panelWidth));
+  }, [panelWidth, dragging]);
+
   // Labels and date visibility based on what's being added
   const isAddingStart = stops.length === 0;
   const isAddingEnd = stops.length === 1;
@@ -177,7 +205,9 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
           placeholder={searchPlaceholder}
           showDates={showDates}
           defaultArrivalDate={suggestedArrivalDate}
+          tripStartDate={tripStartDate}
           tripEndDate={tripEndDate}
+          disabledRanges={bookedRanges}
         />
       </div>
 
@@ -190,7 +220,6 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
           </p>
           <StopList
             stops={stops}
-            onMove={handleMove}
             onRemove={handleRemove}
             onUpdateDates={handleUpdateDates}
             tripStartDate={tripStartDate}
@@ -242,12 +271,28 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
         {mobileTab === "route" ? routePanel : mapPanel}
       </div>
 
-      {/* Desktop: side by side */}
-      <div className="hidden lg:flex flex-row gap-6">
-        <div className="flex-1 h-[600px] rounded-xl overflow-hidden border border-gray-200">
+      {/* Desktop: side by side with draggable divider */}
+      <div ref={desktopContainerRef} className="hidden lg:flex flex-row items-stretch">
+        <div className="flex-1 min-w-0 h-[600px] rounded-xl overflow-hidden border border-gray-200">
           <TripMap stops={stops} />
         </div>
-        <div className="w-80 xl:w-96">
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize stops panel"
+          onMouseDown={() => setDragging(true)}
+          className="group relative flex items-center justify-center w-4 mx-1 cursor-col-resize select-none"
+        >
+          <div
+            className="h-16 w-1 rounded-full bg-gray-300 group-hover:bg-emerald-500 transition-colors"
+            style={{ backgroundColor: dragging ? "#059669" : undefined }}
+          />
+          <GripVertical
+            className="absolute h-4 w-4 text-white pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ opacity: dragging ? 1 : undefined }}
+          />
+        </div>
+        <div style={{ width: panelWidth }} className="shrink-0 min-w-0">
           {routePanel}
         </div>
       </div>

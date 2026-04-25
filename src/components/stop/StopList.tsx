@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronUp, ChevronDown, Trash2, MapPin, Pencil, Check, X, AlertTriangle, ArrowRight } from "lucide-react";
+import { Trash2, MapPin, Pencil, Check, X, AlertTriangle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker, type DateRange } from "@/components/ui/date-picker";
 
 interface Stop {
   stopId: string;
@@ -23,7 +24,6 @@ interface Stop {
 
 interface StopListProps {
   stops: Stop[];
-  onMove: (stopId: string, direction: "up" | "down") => void;
   onRemove: (stopId: string) => void;
   onUpdateDates: (stopId: string, arrivalDate: string, departureDate: string, checkInTime: string, checkOutTime: string) => void;
   tripStartDate?: string;
@@ -170,19 +170,21 @@ function TripNightsSummary({ stops, tripStartDate, tripEndDate }: {
 function StopItem({
   stop,
   index,
-  total,
   isStart,
   isEnd,
-  onMove,
+  tripStartDate,
+  tripEndDate,
+  disabledRanges,
   onRemove,
   onUpdateDates,
 }: {
   stop: Stop;
   index: number;
-  total: number;
   isStart: boolean;
   isEnd: boolean;
-  onMove: (stopId: string, direction: "up" | "down") => void;
+  tripStartDate?: string;
+  tripEndDate?: string;
+  disabledRanges?: DateRange[];
   onRemove: (stopId: string) => void;
   onUpdateDates: (stopId: string, arrivalDate: string, departureDate: string, checkInTime: string, checkOutTime: string) => void;
 }) {
@@ -257,11 +259,13 @@ function StopItem({
               <div className="grid grid-cols-2 gap-2 overflow-hidden">
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-[10px] text-gray-400">Arrival date</p>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={draftArrival}
-                    onChange={e => setDraftArrival(e.target.value)}
-                    className="h-11 w-full min-w-0"
+                    onChange={setDraftArrival}
+                    min={tripStartDate}
+                    max={tripEndDate}
+                    disabledRanges={disabledRanges}
+                    placeholder="Select date"
                   />
                 </div>
                 <div className="space-y-0.5 min-w-0">
@@ -279,6 +283,7 @@ function StopItem({
                   <p className="text-[10px] text-gray-400">Check-in</p>
                   <Input
                     type="time"
+                    step={1800}
                     value={draftCheckIn}
                     onChange={e => setDraftCheckIn(e.target.value)}
                     className="h-11 w-full min-w-0"
@@ -288,6 +293,7 @@ function StopItem({
                   <p className="text-[10px] text-gray-400">Check-out</p>
                   <Input
                     type="time"
+                    step={1800}
                     value={draftCheckOut}
                     onChange={e => setDraftCheckOut(e.target.value)}
                     className="h-11 w-full min-w-0"
@@ -321,18 +327,15 @@ function StopItem({
       </div>
 
       <div className="flex items-center gap-0.5 flex-shrink-0">
-        <Link
-          href={`/trips/${stop.tripId}/stops/${stop.stopId}`}
-          className="h-11 w-11 lg:h-8 lg:w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-accent transition-colors"
-        >
-          <ArrowRight className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-        </Link>
-        <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8" disabled={index === 0} onClick={() => onMove(stop.stopId, "up")}>
-          <ChevronUp className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8" disabled={index === total - 1} onClick={() => onMove(stop.stopId, "down")}>
-          <ChevronDown className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-        </Button>
+        {!isStart && !isEnd && (
+          <Link
+            href={`/trips/${stop.tripId}/stops/${stop.stopId}`}
+            aria-label={`Manage ${stop.name}`}
+            className="h-11 w-11 lg:h-8 lg:w-8 flex items-center justify-center rounded-md text-gray-400 hover:text-blue-600 hover:bg-accent transition-colors"
+          >
+            <ArrowRight className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+          </Link>
+        )}
         <Button variant="ghost" size="icon" className="h-11 w-11 lg:h-8 lg:w-8 text-red-400 hover:text-red-600" onClick={() => onRemove(stop.stopId)}>
           <Trash2 className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
         </Button>
@@ -341,7 +344,7 @@ function StopItem({
   );
 }
 
-export function StopList({ stops, onMove, onRemove, onUpdateDates, tripStartDate, tripEndDate }: StopListProps) {
+export function StopList({ stops, onRemove, onUpdateDates, tripStartDate, tripEndDate }: StopListProps) {
   if (stops.length === 0) {
     return (
       <div className="text-center py-8 text-gray-400">
@@ -351,6 +354,11 @@ export function StopList({ stops, onMove, onRemove, onUpdateDates, tripStartDate
     );
   }
 
+  const middleStops = stops.length > 2 ? stops.slice(1, -1) : [];
+  const allRanges: Array<{ stopId: string; range: DateRange }> = middleStops
+    .filter(s => s.arrivalDate && s.departureDate)
+    .map(s => ({ stopId: s.stopId, range: { from: s.arrivalDate!, to: s.departureDate! } }));
+
   return (
     <div>
       <TripNightsSummary stops={stops} tripStartDate={tripStartDate} tripEndDate={tripEndDate} />
@@ -358,15 +366,17 @@ export function StopList({ stops, onMove, onRemove, onUpdateDates, tripStartDate
         {stops.map((stop, i) => {
           const isStart = i === 0;
           const isEnd = i === stops.length - 1 && stops.length > 1;
+          const siblingRanges = allRanges.filter(r => r.stopId !== stop.stopId).map(r => r.range);
           return (
             <li key={stop.stopId}>
               <StopItem
                 stop={stop}
                 index={i}
-                total={stops.length}
                 isStart={isStart}
                 isEnd={isEnd}
-                onMove={onMove}
+                tripStartDate={tripStartDate}
+                tripEndDate={tripEndDate}
+                disabledRanges={siblingRanges}
                 onRemove={onRemove}
                 onUpdateDates={onUpdateDates}
               />

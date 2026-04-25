@@ -48,3 +48,24 @@ body {
   color: #059669 !important;
   font-weight: 600;
 }
+
+/* Date picker: red line through unavailable dates */
+.rdp-day.rdp-disabled:not(.rdp-selected) {
+  opacity: 1;
+}
+.rdp-day.rdp-disabled:not(.rdp-selected) .rdp-day_button {
+  position: relative;
+  color: #6b7280;
+}
+.rdp-day.rdp-disabled:not(.rdp-selected) .rdp-day_button::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  height: 3px;
+  background-color: #dc2626;
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}

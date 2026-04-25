@@ -20,8 +20,6 @@ interface Stop {
 
 interface Props {
   stop: Stop;
-  isStart: boolean;
-  isEnd: boolean;
   initialNotes: StopNote[];
   contact: PlaceContact;
   initialSummary?: string;
@@ -47,7 +45,7 @@ function nightsBetween(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function StopDetailClient({ stop, isStart, isEnd, initialNotes, contact, initialSummary, initialSummaryGeneratedAt }: Props) {
+export function StopDetailClient({ stop, initialNotes, contact, initialSummary, initialSummaryGeneratedAt }: Props) {
   const [tab, setTab] = useState<Tab>("booking");
   const [notes, setNotes] = useState<StopNote[]>(initialNotes);
   const [noteText, setNoteText] = useState("");
@@ -181,14 +179,11 @@ export function StopDetailClient({ stop, isStart, isEnd, initialNotes, contact, 
             </Card>
           )}
 
-          {/* Booking status — only for middle stops */}
-          {!isStart && !isEnd && (
-            <BookingConfirmButton
-              tripId={stop.tripId}
-              stopId={stop.stopId}
-              initialStatus={stop.bookingStatus}
-            />
-          )}
+          <BookingConfirmButton
+            tripId={stop.tripId}
+            stopId={stop.stopId}
+            initialStatus={stop.bookingStatus}
+          />
 
           {/* Contact details */}
           <Card>

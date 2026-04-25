@@ -5,6 +5,7 @@ import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker, type DateRange } from "@/components/ui/date-picker";
 import { Plus, Loader2, X } from "lucide-react";
 
 interface StopSearchProps {
@@ -13,7 +14,9 @@ interface StopSearchProps {
   placeholder?: string;
   showDates?: boolean;
   defaultArrivalDate?: string;
+  tripStartDate?: string;
   tripEndDate?: string;
+  disabledRanges?: DateRange[];
 }
 
 interface PendingPlace {
@@ -34,7 +37,7 @@ function addNights(date: string, nights: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a place…", showDates = true, defaultArrivalDate, tripEndDate }: StopSearchProps) {
+export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a place…", showDates = true, defaultArrivalDate, tripStartDate, tripEndDate, disabledRanges }: StopSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const defaultArrivalRef = useRef(defaultArrivalDate);
   const tripEndRef = useRef(tripEndDate);
@@ -154,11 +157,13 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
             <div className="grid grid-cols-2 gap-2 overflow-hidden">
               <div className="space-y-1 min-w-0">
                 <Label className="text-xs">Arrival date</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={arrivalDate}
-                  onChange={e => setArrivalDate(e.target.value)}
-                  className="h-11 w-full min-w-0"
+                  onChange={setArrivalDate}
+                  min={tripStartDate}
+                  max={tripEndDate}
+                  disabledRanges={disabledRanges}
+                  placeholder="Select date"
                 />
               </div>
               <div className="space-y-1 min-w-0">
@@ -176,6 +181,7 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
                 <Label className="text-xs">Check-in</Label>
                 <Input
                   type="time"
+                  step={1800}
                   value={checkInTime}
                   onChange={e => setCheckInTime(e.target.value)}
                   className="h-11 w-full min-w-0"
@@ -185,6 +191,7 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
                 <Label className="text-xs">Check-out</Label>
                 <Input
                   type="time"
+                  step={1800}
                   value={checkOutTime}
                   onChange={e => setCheckOutTime(e.target.value)}
                   className="h-11 w-full min-w-0"
