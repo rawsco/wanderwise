@@ -11,6 +11,7 @@ interface Stop {
   stopId: string;
   tripId: string;
   order: number;
+  kind?: "start" | "intermediate" | "end";
   name: string;
   address: string;
   lat: number;
@@ -54,7 +55,7 @@ function TripNightsSummary({ stops, tripStartDate, tripEndDate }: {
   const totalNights = nightsBetween(tripStartDate, tripEndDate);
   if (totalNights <= 0) return null;
 
-  const middleStops = stops.length > 2 ? stops.slice(1, stops.length - 1) : [];
+  const middleStops = stops.filter(s => s.kind === "intermediate");
 
   // For each night, find which stop covers it (if any)
   type NightInfo = { status: "confirmed" | "pending" | "enquiry" | "gap" | "overlap"; stopIndex: number | null };
@@ -354,7 +355,7 @@ export function StopList({ stops, onRemove, onUpdateDates, tripStartDate, tripEn
     );
   }
 
-  const middleStops = stops.length > 2 ? stops.slice(1, -1) : [];
+  const middleStops = stops.filter(s => s.kind === "intermediate");
   const allRanges: Array<{ stopId: string; range: DateRange }> = middleStops
     .filter(s => s.arrivalDate && s.departureDate)
     .map(s => ({ stopId: s.stopId, range: { from: s.arrivalDate!, to: s.departureDate! } }));
@@ -364,8 +365,8 @@ export function StopList({ stops, onRemove, onUpdateDates, tripStartDate, tripEn
       <TripNightsSummary stops={stops} tripStartDate={tripStartDate} tripEndDate={tripEndDate} />
       <ol className="space-y-1.5">
         {stops.map((stop, i) => {
-          const isStart = i === 0;
-          const isEnd = i === stops.length - 1 && stops.length > 1;
+          const isStart = stop.kind === "start";
+          const isEnd = stop.kind === "end";
           const siblingRanges = allRanges.filter(r => r.stopId !== stop.stopId).map(r => r.range);
           return (
             <li key={stop.stopId}>

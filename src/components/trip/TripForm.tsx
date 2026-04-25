@@ -1,22 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { X } from "lucide-react";
 
-const schema = z.object({
+const baseSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
 });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<typeof baseSchema>;
+
+interface Anchor {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  placeId?: string;
+}
 
 interface Profile {
   profileId: string;
@@ -32,13 +42,25 @@ interface TripFormProps {
   profiles: Profile[];
 }
 
-export function TripForm({ tripId, defaultValues, profiles }: TripFormProps) {
+export function TripForm(props: TripFormProps) {
+  return (
+    <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!} libraries={["places"]}>
+      <TripFormInner {...props} />
+    </APIProvider>
+  );
+}
+
+function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
   const router = useRouter();
+  const isEdit = Boolean(tripId);
   const [memberIds, setMemberIds] = useState<string[]>(defaultValues?.memberIds ?? []);
+  const [startLocation, setStartLocation] = useState<Anchor | null>(null);
+  const [endLocation, setEndLocation] = useState<Anchor | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(baseSchema) as any,
     defaultValues,
   });
 
@@ -47,18 +69,38 @@ export function TripForm({ tripId, defaultValues, profiles }: TripFormProps) {
   }
 
   async function onSubmit(data: FormValues) {
+    setSubmitError(null);
+
+    if (!isEdit && (!startLocation || !endLocation)) {
+      setSubmitError("Pick both a start and an end location.");
+      return;
+    }
+    if (data.endDate < data.startDate) {
+      setSubmitError("End date must be on or after the start date.");
+      return;
+    }
+
     const url = tripId ? `/api/trips/${tripId}` : "/api/trips";
     const method = tripId ? "PATCH" : "POST";
+    const body = isEdit
+      ? { ...data, memberIds }
+      : { ...data, memberIds, startLocation, endLocation };
+
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, memberIds }),
+      body: JSON.stringify(body),
     });
+
     if (res.ok) {
       const trip = await res.json();
       router.push(`/trips/${tripId ?? trip.tripId}`);
       router.refresh();
+      return;
     }
+
+    const err = await res.json().catch(() => null);
+    setSubmitError(err?.error ?? "Something went wrong saving the trip.");
   }
 
   return (
@@ -78,12 +120,31 @@ export function TripForm({ tripId, defaultValues, profiles }: TripFormProps) {
         <div className="space-y-1.5">
           <Label htmlFor="startDate">Start date</Label>
           <Input id="startDate" type="date" {...register("startDate")} />
+          {errors.startDate && <p className="text-xs text-red-500">{errors.startDate.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="endDate">End date</Label>
           <Input id="endDate" type="date" {...register("endDate")} />
+          {errors.endDate && <p className="text-xs text-red-500">{errors.endDate.message}</p>}
         </div>
       </div>
+
+      {!isEdit && (
+        <>
+          <AnchorPicker
+            label="Start location"
+            placeholder="Where does the trip begin?"
+            value={startLocation}
+            onChange={setStartLocation}
+          />
+          <AnchorPicker
+            label="End location"
+            placeholder="Where does the trip end?"
+            value={endLocation}
+            onChange={setEndLocation}
+          />
+        </>
+      )}
 
       <div className="space-y-1.5">
         <Label>Who&apos;s coming?</Label>
@@ -112,9 +173,84 @@ export function TripForm({ tripId, defaultValues, profiles }: TripFormProps) {
         )}
       </div>
 
+      {submitError && (
+        <p className="text-sm text-red-500">{submitError}</p>
+      )}
+
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "Saving…" : tripId ? "Save changes" : "Create trip"}
       </Button>
     </form>
+  );
+}
+
+interface AnchorPickerProps {
+  label: string;
+  placeholder: string;
+  value: Anchor | null;
+  onChange: (anchor: Anchor | null) => void;
+}
+
+function AnchorPicker({ label, placeholder, value, onChange }: AnchorPickerProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const placesLib = useMapsLibrary("places");
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    if (!placesLib || !inputRef.current) return;
+
+    const autocomplete = new placesLib.Autocomplete(inputRef.current, {
+      fields: ["name", "formatted_address", "geometry", "place_id"],
+    });
+
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry?.location) return;
+      onChange({
+        name: place.name ?? "",
+        address: place.formatted_address ?? "",
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng(),
+        placeId: place.place_id,
+      });
+      setInputValue("");
+    });
+
+    return () => {
+      google.maps.event.removeListener(listener);
+      google.maps.event.clearInstanceListeners(autocomplete);
+    };
+  }, [placesLib, onChange]);
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {value ? (
+        <div className="flex items-start justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 overflow-hidden">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">{value.name}</p>
+            <p className="text-xs text-gray-500 truncate">{value.address}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-gray-600 shrink-0"
+            aria-label={`Clear ${label}`}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder={placeholder}
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          className="h-11 text-base"
+          autoComplete="off"
+        />
+      )}
+    </div>
   );
 }

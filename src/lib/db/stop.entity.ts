@@ -8,6 +8,7 @@ export const StopEntity = new Entity(
       stopId: { type: "string", required: true },
       tripId: { type: "string", required: true },
       order: { type: "number", required: true },
+      kind: { type: ["start", "intermediate", "end"] as const },
       name: { type: "string", required: true },
       address: { type: "string", required: true },
       lat: { type: "number", required: true },
