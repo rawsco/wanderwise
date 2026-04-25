@@ -46,9 +46,10 @@ When you would otherwise need to ask the human a question:
 
 1. Compose a Jira comment listing your unresolved questions as bullet points, prefixed with: `Started work on this but hit ambiguity. Pausing until the ticket is updated:`
 2. Post it: `printf '%s' "<body>" | bin/lib/jira.sh comment <TICKET_KEY>`
-3. Transition: `bin/lib/jira.sh transition <TICKET_KEY> "Ready For Claude"`
-4. Print a one-line summary to stdout (`refused: <reason>`) and exit.
-5. Do not start the dev stack. Do not write a plan. Do not push.
+3. Apply the `claude-blocked` label so the poller (`bin/jira-poller`) doesn't re-pick this ticket until the human edits it: `bin/lib/jira.sh label-add <TICKET_KEY> claude-blocked`. The human removes the label after updating the ticket; the poller then re-queues it.
+4. Transition: `bin/lib/jira.sh transition <TICKET_KEY> "Ready For Claude"` (the ticket stays visible to the human, but the label keeps the poller from re-picking it).
+5. Print a one-line summary to stdout (`refused: <reason>`) and exit.
+6. Do not start the dev stack. Do not write a plan. Do not push.
 
 ## Phase 2 — Plan
 

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd user agent for bin/jira-poller.
+
+  Install:
+    cp infra/jira-poller/com.wanderwise.jira-poller.plist ~/Library/LaunchAgents/
+    # Edit the copy in ~/Library/LaunchAgents and replace REPLACE_HOME with
+    # your actual home path (e.g. /Users/rosslyall) — launchd does not
+    # expand $HOME inside plist values.
+    launchctl load -w ~/Library/LaunchAgents/com.wanderwise.jira-poller.plist
+
+  Stop / disable:
+    launchctl unload -w ~/Library/LaunchAgents/com.wanderwise.jira-poller.plist
+
+  Tail logs:
+    tail -f ~/Library/Logs/wanderwise-poller.log
+
+  Uninstall:
+    launchctl unload -w ~/Library/LaunchAgents/com.wanderwise.jira-poller.plist
+    rm ~/Library/LaunchAgents/com.wanderwise.jira-poller.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wanderwise.jira-poller</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>REPLACE_HOME/ClaudeProjects/wanderwise/bin/jira-poller</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- launchd starts processes with a minimal PATH; ensure brew bins
+             (gh, jq, claude, docker) are reachable. Adjust if your prefix
+             is different (e.g. /opt/homebrew on Apple Silicon). -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>REPLACE_HOME</string>
+        <key>POLL_INTERVAL_SECONDS</key>
+        <string>60</string>
+        <key>WANDERWISE_DIR</key>
+        <string>REPLACE_HOME/ClaudeProjects/wanderwise</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>REPLACE_HOME/ClaudeProjects/wanderwise</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Restart only on crash, not on clean exit. -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>REPLACE_HOME/Library/Logs/wanderwise-poller.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>REPLACE_HOME/Library/Logs/wanderwise-poller.log</string>
+
+    <!-- Throttle restart attempts so a misconfig doesn't busy-loop. -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+</dict>
+</plist>
