@@ -6,9 +6,29 @@
 
 declare module "sst" {
   export interface Resource {
+    "GoogleMapsApiKey": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "Media": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "NextAuthSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "Table": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "UserPool": {
       "id": string
       "type": "sst.aws.CognitoUserPool"
+    }
+    "Web": {
+      "type": "sst.aws.Nextjs"
+      "url": string
     }
     "WebClient": {
       "id": string

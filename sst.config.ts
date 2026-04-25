@@ -27,8 +27,17 @@ export default $config({
     };
   },
   async run() {
+    const fs = await import("fs");
+    const path = await import("path");
+
+    const brandingSettings = JSON.parse(
+      fs.readFileSync(
+        path.join(process.cwd(), "infra/cognito-branding-settings.json"),
+        "utf8",
+      ),
+    );
+
     const stage = $app.stage;
-    const isStaging = stage === "staging";
     const isCloudStage = stage === "staging" || stage === "production";
     const stageDomain = STAGE_DOMAINS[stage];
 
@@ -55,12 +64,6 @@ export default $config({
       usernames: ["email"],
       transform: {
         userPool: (args) => {
-          if (isStaging) {
-            args.adminCreateUserConfig = {
-              ...args.adminCreateUserConfig,
-              allowAdminCreateUserOnly: true,
-            };
-          }
           args.autoVerifiedAttributes = ["email"];
           args.passwordPolicies = {
             minimumLength: 8,
@@ -75,9 +78,11 @@ export default $config({
 
     // Hosted UI domain (Cognito prefix; globally unique).
     // Adds a stage-prefixed subdomain under amazoncognito.com.
+    // managedLoginVersion: 2 enables the modern Managed Login experience.
     new aws.cognito.UserPoolDomain("UserPoolDomain", {
       userPoolId: userPool.id,
       domain: `wanderwise-${stage}`,
+      managedLoginVersion: 2,
     });
 
     const callbackUrls = stageDomain
@@ -104,6 +109,13 @@ export default $config({
           ];
         },
       },
+    });
+
+    // ---- Managed Login branding (WanderWise theme) ----
+    new aws.cognito.ManagedLoginBranding("UserPoolBranding", {
+      userPoolId: userPool.id,
+      clientId: userPoolClient.id,
+      settings: JSON.stringify(brandingSettings),
     });
 
     // ---- Outputs (always shown after deploy) ----
@@ -137,17 +149,19 @@ export default $config({
       permissions: [
         {
           actions: ["bedrock:InvokeModel"],
-          resources: ["arn:aws:bedrock:*::foundation-model/anthropic.claude-*"],
+          resources: [
+            "arn:aws:bedrock:*::foundation-model/amazon.nova-*",
+            "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+          ],
         },
       ],
       environment: {
         AI_PROVIDER: "bedrock",
         BEDROCK_REGION: REGION,
-        BEDROCK_MODEL_ID: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        BEDROCK_MODEL_ID: "amazon.nova-lite-v1:0",
         DYNAMODB_TABLE_NAME: table!.name,
         S3_BUCKET: media!.name,
         S3_REGION: REGION,
-        AWS_REGION: REGION,
         COGNITO_REGION: REGION,
         COGNITO_CLIENT_ID: userPoolClient.id,
         COGNITO_CLIENT_SECRET: userPoolClient.secret,
