@@ -3,22 +3,25 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { UserEntity } from "./db/user.entity";
 
+const isProd = process.env.NODE_ENV === "production";
+const cookiePrefix = isProd ? "__Secure-" : "";
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
-  useSecureCookies: false,
+  useSecureCookies: isProd,
   cookies: {
     sessionToken: {
-      name: "next-auth.session-token",
-      options: { httpOnly: true, sameSite: "lax", path: "/", secure: false },
+      name: `${cookiePrefix}next-auth.session-token`,
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: isProd },
     },
     callbackUrl: {
-      name: "next-auth.callback-url",
-      options: { sameSite: "lax", path: "/", secure: false },
+      name: `${cookiePrefix}next-auth.callback-url`,
+      options: { sameSite: "lax", path: "/", secure: isProd },
     },
     csrfToken: {
-      name: "next-auth.csrf-token",
-      options: { httpOnly: true, sameSite: "lax", path: "/", secure: false },
+      name: `${cookiePrefix}next-auth.csrf-token`,
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: isProd },
     },
   },
   providers: [

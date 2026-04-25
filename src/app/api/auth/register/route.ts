@@ -3,7 +3,6 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { UserEntity } from "@/lib/db/user.entity";
-import { bootstrapTable } from "@/lib/db/bootstrap";
 
 const schema = z.object({
   email: z.string().email(),
@@ -13,7 +12,6 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    await bootstrapTable();
     const body = await req.json();
     const { email, password, name } = schema.parse(body);
 

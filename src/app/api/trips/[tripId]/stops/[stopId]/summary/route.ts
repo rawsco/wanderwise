@@ -6,6 +6,8 @@ import { ProfileEntity } from "@/lib/db/profile.entity";
 import { generateStopSummary } from "@/lib/stop-summary";
 import type { StopNote } from "@/types/stop";
 
+export const maxDuration = 25;
+
 function nightsBetween(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
 }

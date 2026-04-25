@@ -17,6 +17,7 @@ export const s3 = new S3Client({
 export const BUCKET = process.env.S3_BUCKET ?? "wanderwise";
 
 export async function ensureBucket() {
+  if (!isLocal) return;
   try {
     await s3.send(new HeadBucketCommand({ Bucket: BUCKET }));
   } catch {

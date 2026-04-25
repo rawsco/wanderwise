@@ -42,6 +42,33 @@ async function generateLMStudio(opts: GenerateOptions): Promise<string> {
   return content.trim();
 }
 
-async function generateBedrock(_opts: GenerateOptions): Promise<string> {
-  throw new Error("Bedrock provider not yet wired up — set AI_PROVIDER=lmstudio for local dev");
+async function generateBedrock(opts: GenerateOptions): Promise<string> {
+  const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
+
+  const region = process.env.BEDROCK_REGION ?? "eu-west-2";
+  const modelId = process.env.BEDROCK_MODEL_ID ?? "anthropic.claude-3-5-sonnet-20241022-v2:0";
+
+  const system = opts.messages.find(m => m.role === "system")?.content;
+  const messages = opts.messages
+    .filter(m => m.role !== "system")
+    .map(m => ({ role: m.role, content: m.content }));
+
+  const client = new BedrockRuntimeClient({ region });
+  const res = await client.send(new InvokeModelCommand({
+    modelId,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: opts.maxTokens ?? 800,
+      temperature: opts.temperature ?? 0.7,
+      ...(system && { system }),
+      messages,
+    }),
+  }));
+
+  const payload = JSON.parse(new TextDecoder().decode(res.body));
+  const content = payload.content?.[0]?.text;
+  if (typeof content !== "string") throw new Error("Bedrock returned no content");
+  return content.trim();
 }
