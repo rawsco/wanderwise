@@ -3,7 +3,6 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/auth-helpers";
 import { StopEntity } from "@/lib/db/stop.entity";
 import { TripEntity } from "@/lib/db/trip.entity";
-import { refreshSummaryIfStale } from "@/lib/stops";
 
 const updateSchema = z.object({
   order: z.number().int().min(0).optional(),
@@ -81,8 +80,6 @@ export async function PATCH(
     }
 
     await StopEntity.update({ tripId, stopId }).set(data).go();
-
-    await refreshSummaryIfStale(tripId, stopId);
 
     return NextResponse.json({ stopId, tripId, ...data });
   } catch (err) {

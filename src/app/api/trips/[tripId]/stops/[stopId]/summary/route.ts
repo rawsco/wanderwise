@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-helpers";
 import { TripEntity } from "@/lib/db/trip.entity";
-import { forceRefreshSummary } from "@/lib/stops";
+import { ensureFreshSummary } from "@/lib/stops";
 
 export const maxDuration = 25;
 
@@ -20,12 +20,12 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const result = await forceRefreshSummary(tripId, stopId);
+    const result = await ensureFreshSummary(tripId, stopId);
     if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate summary";
+    const message = err instanceof Error ? err.message : "Failed to load summary";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

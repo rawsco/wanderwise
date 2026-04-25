@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, Map, ListChecks, BookOpen, Phone, Globe, Loader2, Trash2, Send, Sparkles, RefreshCw } from "lucide-react";
+import { Calendar, Clock, Map, ListChecks, BookOpen, Phone, Globe, Loader2, Trash2, Send, Sparkles } from "lucide-react";
 import { BookingConfirmButton } from "@/components/stop/BookingConfirmButton";
+import { bookingHash } from "@/lib/booking-hash";
 import type { StopNote } from "@/types/stop";
 import type { PlaceContact } from "@/lib/places";
 
 interface Stop {
   stopId: string;
   tripId: string;
+  name: string;
+  address: string;
   arrivalDate?: string;
   departureDate?: string;
   checkInTime?: string;
@@ -24,6 +27,7 @@ interface Props {
   contact: PlaceContact;
   initialSummary?: string;
   initialSummaryGeneratedAt?: string;
+  initialSummaryHash?: string;
 }
 
 type Tab = "booking" | "summary" | "todo" | "checklist";
@@ -45,35 +49,80 @@ function nightsBetween(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function StopDetailClient({ stop, initialNotes, contact, initialSummary, initialSummaryGeneratedAt }: Props) {
+export function StopDetailClient({ stop, initialNotes, contact, initialSummary, initialSummaryGeneratedAt, initialSummaryHash }: Props) {
   const [tab, setTab] = useState<Tab>("booking");
   const [notes, setNotes] = useState<StopNote[]>(initialNotes);
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [bookingStatus, setBookingStatus] = useState<"enquiry" | "pending" | "confirmed" | undefined>(stop.bookingStatus);
   const [summary, setSummary] = useState<string | undefined>(initialSummary);
   const [summaryAt, setSummaryAt] = useState<string | undefined>(initialSummaryGeneratedAt);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryHash, setSummaryHash] = useState<string | undefined>(initialSummaryHash);
+  const [summaryRegenerating, setSummaryRegenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  async function generateSummary() {
-    setSummaryLoading(true);
-    setSummaryError(null);
-    try {
-      const res = await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}/summary`, { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) {
-        setSummaryError(json.error ?? "Failed to generate summary");
-      } else {
-        setSummary(json.summary);
-        setSummaryAt(json.summaryGeneratedAt);
+  // Lazy-fetch the summary when the tab is opened. We pre-compute the
+  // expected hash from the same booking inputs the server uses; if it
+  // differs from the stored hash we know the server is going to
+  // regenerate and we clear the visible summary up-front so no stale
+  // text is shown while the new one is being produced.
+  useEffect(() => {
+    if (tab !== "summary") return;
+    let cancelled = false;
+
+    (async () => {
+      const expected = await bookingHash({
+        name: stop.name,
+        address: stop.address,
+        arrivalDate: stop.arrivalDate,
+        departureDate: stop.departureDate,
+        checkInTime: stop.checkInTime,
+        checkOutTime: stop.checkOutTime,
+        bookingStatus,
+        notes: notes.map(n => ({ text: n.text })),
+      });
+      if (cancelled) return;
+
+      const willRegen = expected !== summaryHash;
+      const startedAt = Date.now();
+      if (willRegen) {
+        setSummary(undefined);
+        setSummaryAt(undefined);
+        setSummaryRegenerating(true);
       }
-    } catch (err) {
-      setSummaryError(err instanceof Error ? err.message : "Failed to generate summary");
-    }
-    setSummaryLoading(false);
-  }
+
+      try {
+        const res = await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}/summary`, { method: "POST" });
+        const json = await res.json();
+        if (cancelled) return;
+
+        // If we cleared the summary up-front, hold the shimmer for at
+        // least ~600ms so a fast regen doesn't flash sub-frame and feel
+        // like nothing happened.
+        if (willRegen) {
+          const MIN_SHIMMER_MS = 600;
+          const elapsed = Date.now() - startedAt;
+          if (elapsed < MIN_SHIMMER_MS) {
+            await new Promise(r => setTimeout(r, MIN_SHIMMER_MS - elapsed));
+          }
+          if (cancelled) return;
+        }
+
+        if (json.summary) {
+          setSummary(json.summary);
+          setSummaryAt(json.summaryGeneratedAt);
+          if (json.summaryHash) setSummaryHash(json.summaryHash);
+        }
+      } catch (err) {
+        console.error("[stop-summary] fetch failed", err);
+      } finally {
+        if (!cancelled) setSummaryRegenerating(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [tab, stop, bookingStatus, notes, summaryHash]);
 
   const nights = stop.arrivalDate && stop.departureDate
     ? nightsBetween(stop.arrivalDate, stop.departureDate)
@@ -182,7 +231,8 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
           <BookingConfirmButton
             tripId={stop.tripId}
             stopId={stop.stopId}
-            initialStatus={stop.bookingStatus}
+            value={bookingStatus}
+            onChange={setBookingStatus}
           />
 
           {/* Contact details */}
@@ -292,46 +342,28 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {summary ? (
+            {summaryRegenerating ? (
+              <div className="space-y-2 py-1" aria-busy="true" aria-live="polite">
+                <div className="shimmer" style={{ height: 14, width: "100%" }}></div>
+                <div className="shimmer" style={{ height: 14, width: "92%" }}></div>
+                <div className="shimmer" style={{ height: 14, width: "75%" }}></div>
+                <div className="shimmer" style={{ height: 14, width: "85%" }}></div>
+              </div>
+            ) : summary ? (
               <>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{summary}</p>
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                  {summaryAt && (
-                    <p className="text-[11px] text-gray-400">
-                      Generated {new Date(summaryAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
-                  )}
-                  <Button
-                    onClick={generateSummary}
-                    disabled={summaryLoading}
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs"
-                  >
-                    {summaryLoading
-                      ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      : <RefreshCw className="h-3 w-3 mr-1" />
-                    }
-                    Regenerate
-                  </Button>
-                </div>
+                {summaryAt && (
+                  <p className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
+                    Generated {new Date(summaryAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                )}
               </>
-            ) : summaryLoading ? (
-              <div className="py-8 text-center text-gray-400">
-                <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
-                <p className="text-sm">Generating summary…</p>
-              </div>
             ) : (
               <div className="py-6 text-center">
                 <Sparkles className="h-8 w-8 mx-auto mb-3 text-gray-300" />
                 <p className="text-sm text-gray-500">
                   A summary will appear here once you&apos;ve added arrival dates or notes for this stop.
                 </p>
-              </div>
-            )}
-            {summaryError && (
-              <div className="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs text-red-700">
-                {summaryError}
               </div>
             )}
           </CardContent>

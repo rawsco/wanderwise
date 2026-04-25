@@ -10,6 +10,11 @@ import { sortStopsByDate } from "@/lib/stops";
 import { getPlaceContact, findPlaceContact } from "@/lib/places";
 import type { StopNote } from "@/types/stop";
 
+// Always read fresh — the cached summary updates server-side when
+// booking fields change, and we don't want any RSC caching to serve
+// the previous summary after that update.
+export const dynamic = "force-dynamic";
+
 export default async function StopDetailPage({
   params,
 }: {
@@ -75,6 +80,8 @@ export default async function StopDetailPage({
         stop={{
           stopId: stop.stopId,
           tripId,
+          name: stop.name,
+          address: stop.address,
           arrivalDate: stop.arrivalDate,
           departureDate: stop.departureDate,
           checkInTime: stop.checkInTime,
@@ -85,6 +92,7 @@ export default async function StopDetailPage({
         contact={contact}
         initialSummary={stop.summary}
         initialSummaryGeneratedAt={stop.summaryGeneratedAt}
+        initialSummaryHash={stop.summaryHash}
       />
     </div>
   );

@@ -52,28 +52,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ tripId
       .set({ ...data, updatedAt: new Date().toISOString() })
       .go();
 
-    // If the trip's start/end dates moved, propagate to the anchor stops.
-    if (data.startDate || data.endDate) {
-      const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
-      const updates: Promise<unknown>[] = [];
-      for (const stop of stopsResult.data) {
-        if (stop.kind === "start" && data.startDate && stop.arrivalDate !== data.startDate) {
-          updates.push(
-            StopEntity.update({ tripId, stopId: stop.stopId })
-              .set({ arrivalDate: data.startDate })
-              .go()
-          );
-        }
-        if (stop.kind === "end" && data.endDate && stop.arrivalDate !== data.endDate) {
-          updates.push(
-            StopEntity.update({ tripId, stopId: stop.stopId })
-              .set({ arrivalDate: data.endDate })
-              .go()
-          );
-        }
+    // Trip-level changes invalidate every stop's cached summary so the
+    // next view regenerates against the new context. We clear the
+    // summaryHash rather than the summary text, so the user briefly
+    // still sees the previous summary before the fresh one swaps in.
+    const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
+    const stopUpdates: Promise<unknown>[] = [];
+    for (const stop of stopsResult.data) {
+      const setFields: Record<string, string> = {};
+      let touched = false;
+
+      // Propagate trip date changes to the anchor stops' arrivalDate.
+      if (stop.kind === "start" && data.startDate && stop.arrivalDate !== data.startDate) {
+        setFields.arrivalDate = data.startDate;
+        touched = true;
       }
-      await Promise.all(updates);
+      if (stop.kind === "end" && data.endDate && stop.arrivalDate !== data.endDate) {
+        setFields.arrivalDate = data.endDate;
+        touched = true;
+      }
+
+      const shouldInvalidate = Boolean(stop.summaryHash);
+      if (!touched && !shouldInvalidate) continue;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let chain: any = StopEntity.update({ tripId, stopId: stop.stopId });
+      if (Object.keys(setFields).length > 0) chain = chain.set(setFields);
+      if (shouldInvalidate) chain = chain.remove(["summaryHash"]);
+      stopUpdates.push(chain.go());
     }
+    await Promise.all(stopUpdates);
 
     return NextResponse.json({ tripId, ...data });
   } catch (err) {

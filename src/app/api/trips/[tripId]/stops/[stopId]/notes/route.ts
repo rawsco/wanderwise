@@ -3,7 +3,6 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { requireAuth } from "@/lib/auth-helpers";
 import { StopEntity } from "@/lib/db/stop.entity";
-import { refreshSummaryIfStale } from "@/lib/stops";
 import type { StopNote } from "@/types/stop";
 
 const createSchema = z.object({
@@ -26,8 +25,6 @@ export async function POST(
     const note: StopNote = { noteId: randomUUID(), text, createdAt: new Date().toISOString() };
     await StopEntity.update({ tripId, stopId }).set({ notes: [...existing, note] }).go();
 
-    await refreshSummaryIfStale(tripId, stopId);
-
     return NextResponse.json(note, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues }, { status: 400 });
@@ -49,8 +46,6 @@ export async function DELETE(
 
     const existing: StopNote[] = (result.data.notes as StopNote[] | undefined) ?? [];
     await StopEntity.update({ tripId, stopId }).set({ notes: existing.filter(n => n.noteId !== noteId) }).go();
-
-    await refreshSummaryIfStale(tripId, stopId);
 
     return NextResponse.json({ success: true });
   } catch {

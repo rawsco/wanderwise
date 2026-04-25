@@ -32,22 +32,31 @@ const options: { value: BookingStatus; label: string; icon: React.ReactNode; act
 interface Props {
   tripId: string;
   stopId: string;
-  initialStatus?: BookingStatus;
+  value: BookingStatus | undefined;
+  onChange: (status: BookingStatus | undefined) => void;
 }
 
-export function BookingConfirmButton({ tripId, stopId, initialStatus }: Props) {
-  const [status, setStatus] = useState<BookingStatus | undefined>(initialStatus);
+export function BookingConfirmButton({ tripId, stopId, value, onChange }: Props) {
   const [saving, setSaving] = useState(false);
 
   async function select(next: BookingStatus) {
+    const previous = value;
+    onChange(next);
     setSaving(true);
-    setStatus(next);
-    await fetch(`/api/trips/${tripId}/stops/${stopId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookingStatus: next }),
-    });
-    setSaving(false);
+    try {
+      const res = await fetch(`/api/trips/${tripId}/stops/${stopId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingStatus: next }),
+      });
+      if (!res.ok) {
+        onChange(previous);
+      }
+    } catch {
+      onChange(previous);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -60,7 +69,7 @@ export function BookingConfirmButton({ tripId, stopId, initialStatus }: Props) {
             onClick={() => select(opt.value)}
             disabled={saving}
             className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 font-medium text-sm transition-colors ${
-              status === opt.value ? opt.active : `bg-white ${opt.inactive}`
+              value === opt.value ? opt.active : `bg-white ${opt.inactive}`
             }`}
           >
             {opt.icon}

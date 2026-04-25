@@ -49,6 +49,23 @@ body {
   font-weight: 600;
 }
 
+/* Shimmer placeholder for AI-generated content while it regenerates */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 0%,
+    #f3f4f6 50%,
+    #e5e7eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-slide 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer-slide {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 /* Date picker: red line through unavailable dates */
 .rdp-day.rdp-disabled:not(.rdp-selected) {
   opacity: 1;
