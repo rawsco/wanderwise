@@ -23,4 +23,4 @@ const stops = result.data; // Stop[]
 
 **Entity key structure.** Stops use `tripId` as PK and `stopId` as SK (see `byTrip` index). Always query stops via `StopEntity.query.byTrip({ tripId })` — never scan the table.
 
-**Table is auto-created on first request** by `src/lib/db/bootstrap.ts`. No manual setup needed for local dev beyond `docker compose up -d`.
+**Table is provisioned by SST**, not at runtime. Per-stage tables (`wanderwise-{stage}`) are defined in `sst.config.ts`. Local dev with DynamoDB Local: `docker compose up -d` starts the container; the local table is created by SST's `sst dev` command (or manually if running raw `npm run dev`).

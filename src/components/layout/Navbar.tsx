@@ -29,14 +29,9 @@ export function Navbar() {
                 </Button>
               </>
             ) : (
-              <>
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">Sign in</Button>
-                </Link>
-                <Link href="/register">
-                  <Button size="sm">Get started</Button>
-                </Link>
-              </>
+              <Link href="/login">
+                <Button size="sm">Sign in</Button>
+              </Link>
             )}
           </div>
 
@@ -54,10 +49,7 @@ export function Navbar() {
                 <button type="button" className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOut({ callbackUrl: "/" })}>Sign out</button>
               </>
             ) : (
-              <>
-                <Link href="/login" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>Sign in</Link>
-                <Link href="/register" className="flex items-center text-sm text-emerald-600 font-medium py-3 px-1" onClick={() => setOpen(false)}>Get started</Link>
-              </>
+              <Link href="/login" className="flex items-center text-sm text-emerald-600 font-medium py-3 px-1" onClick={() => setOpen(false)}>Sign in</Link>
             )}
           </div>
         )}

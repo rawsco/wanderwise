@@ -17,12 +17,9 @@ export default function Home() {
         <p className="text-lg text-gray-500 mb-8 leading-relaxed">
           Map out your route, add stops, and get everything ready for the road — for you, your crew, and your dogs.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link href="/register">
-            <Button size="lg" className="w-full sm:w-auto">Start planning for free</Button>
-          </Link>
+        <div className="flex justify-center">
           <Link href="/login">
-            <Button size="lg" variant="outline" className="w-full sm:w-auto">Sign in</Button>
+            <Button size="lg" className="w-full sm:w-auto">Get started</Button>
           </Link>
         </div>
       </section>

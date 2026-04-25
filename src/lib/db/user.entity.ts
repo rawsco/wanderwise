@@ -7,7 +7,6 @@ export const UserEntity = new Entity(
     attributes: {
       id: { type: "string", required: true },
       email: { type: "string", required: true },
-      passwordHash: { type: "string", required: true },
       name: { type: "string" },
       createdAt: { type: "string", default: () => new Date().toISOString() },
     },
