@@ -55,8 +55,12 @@ export async function setupGitHubOidc() {
   // PowerUserAccess covers the bulk of what SST needs (CloudFormation,
   // Lambda, S3, DynamoDB, CloudFront, Cognito, Route53, ACM, etc.) but
   // explicitly excludes IAM. SST creates Lambda execution roles, so we
-  // need to grant just enough IAM separately. Tightening this is a
-  // tracked follow-up — see the design spec.
+  // need to grant just enough IAM separately. Tightening this — including
+  // narrowing iam:UpdateAssumeRolePolicy and iam:PassRole below to a
+  // path-prefixed resource scope rather than "*" — is a tracked follow-up
+  // (see the design spec). The current Resource: "*" scope is a deliberate,
+  // acknowledged trade-off; iam:UpdateAssumeRolePolicy is required for SST
+  // to update Lambda execution role trust policies during stack updates.
   new aws.iam.RolePolicyAttachment("GitHubActionsDeployPowerUser", {
     role: role.name,
     policyArn: "arn:aws:iam::aws:policy/PowerUserAccess",
