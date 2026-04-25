@@ -21,10 +21,13 @@ jobs:
     name: Deploy to staging
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # `environment: staging` is load-bearing: it sets the OIDC sub-claim to
-    # `repo:rawsco/wanderwise:environment:staging`, which is required by the
-    # IAM trust policy on workflow_dispatch runs. It also gates the run in
-    # the GitHub UI if approval rules are added later.
+    # `environment: staging` is load-bearing. With it set on the job, GitHub
+    # mints OIDC tokens with sub=`repo:rawsco/wanderwise:environment:staging`
+    # for every run — push and workflow_dispatch alike. That sub matches the
+    # IAM trust policy in infra/github-oidc.ts. It also gives us a place to
+    # add a manual approval rule later. (The trust policy keeps an extra
+    # `ref:refs/heads/main` entry as a fallback in case this `environment:`
+    # is ever removed.)
     environment: staging
     steps:
       - uses: actions/checkout@v4
