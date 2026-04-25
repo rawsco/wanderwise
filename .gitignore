@@ -54,3 +54,5 @@ next-env.d.ts
 .docker/
 .env.compose
 BRIEF.md
+.nextdev.log
+.ticket-work.log
