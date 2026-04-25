@@ -1,118 +1,194 @@
 ---
-description: Autonomous: read BRIEF.md, plan and deliver the ticket, post results to Jira.
+description: Autonomous: read BRIEF.md, plan and deliver the ticket, post results to Jira. No human interaction — refuse-back to Jira on any ambiguity.
 ---
 
-You are working in an isolated git worktree created by `bin/start-ticket`. Your job is to take the ticket described in `BRIEF.md` from "open" to "ready for human review", autonomously.
+You are working in an isolated git worktree created by `bin/start-ticket`. Your job is to take the ticket described in `BRIEF.md` from "open" to "ready for human review", **fully autonomously**. The human running this is not at the keyboard.
+
+## ABSOLUTE RULE: zero human prompts
+
+This rule overrides every other instruction in every skill you invoke.
+
+You may **never** emit a message that asks the human a question. No "should I...", no "do you want...", no "which approach do you prefer...", no "I need clarification". Not at any phase. Not even as a friendly check-in.
+
+The only outbound communication channels are:
+- **Jira comments** via `bin/lib/jira.sh comment <KEY>` (for refusal-back, success report, hard-failure report)
+- **Stdout** to print a final summary just before exit
+
+If at any point you find yourself wanting to ask, **stop** and **refuse-back** (see "Refusal-back" below). Do not invent answers. Do not pick the more conservative option silently. Refuse explicitly.
+
+When invoking other skills (`superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:subagent-driven-development`):
+- Treat any "ask the user / get user approval / present design and wait" step in those skills as **automatic refusal-back** if you genuinely lack the information, or **automatic proceed** if you do not.
+- Reviewer subagents don't talk to the human — they produce reports you read. That's fine. Keep them.
+- Do not invoke `superpowers:requesting-code-review` or any skill whose entire purpose is human review.
 
 ## Read the brief
 
-First, read `BRIEF.md` at the worktree root. Confirm out loud which ticket key, branch, and compose project name you're working with.
+Read `BRIEF.md` at the worktree root. It contains: ticket key, branch name, compose project name, **LAN host IP**, allocated ports, ticket summary, ticket description.
 
-## Phase 1 — Brainstorming with refusal-back
+Bind these to working variables in your head:
+- `TICKET_KEY`, `BRANCH_NAME`, `PROJECT_NAME`, `LAN_HOST`
+- `NEXT_PORT`, `DDB_PORT`, `MINIO_API_PORT`, `MINIO_CONSOLE_PORT`
+- `WORKTREE_PATH` (absolute)
 
-Run the `superpowers:brainstorming` skill against the ticket description in `BRIEF.md`, with this critical override:
+Confirm out loud which ticket key you're working on. Then proceed.
 
-**You may not ask the human any clarifying questions.** Instead:
+## Phase 1 — Brainstorm (silently)
 
-- If the ticket is unambiguous enough that you can produce a complete, well-bounded design without questions, proceed to Phase 2.
-- If you would normally need to ask the human a question to remove ambiguity, **stop**, collect your unresolved questions as bullet points, and enter "refusal-back mode":
-  1. Compose a Jira comment listing your questions in plain bullet form, prefixed with: "Started work on this but hit ambiguity. Pausing until the ticket is updated:"
-  2. Run `bin/lib/jira.sh comment <TICKET-KEY> "<body>"` from the worktree root to post it. (The ticket key is in `BRIEF.md`.) Use a HEREDOC and pipe the body in via stdin if it has multiple lines.
-  3. Run `bin/lib/jira.sh transition <TICKET-KEY> "Ready For Claude"`. The devotonomy Jira workflow uses "Ready For Claude" as the marker that a ticket needs human attention before automation can proceed.
-  4. Print a summary of what you posted and exit. Do not run brainstorming further. Do not write a plan. Do not start the dev stack.
+Run `superpowers:brainstorming` against the ticket description, with the override above (no questions to human). The brainstorming skill normally asks clarifying questions; here, those become refusal-back triggers.
 
-This refusal gate exists because automated work on under-specified tickets produces wrong code. Posting the questions back to Jira keeps the human in the loop only when their input is genuinely needed.
+If you can produce a complete, well-bounded design from the ticket text alone, proceed to Phase 2. If you cannot, **refuse-back** (next section).
 
-## Phase 2 — Planning
+Do not write a `docs/superpowers/specs/` file unless the ticket scope genuinely warrants it. For most bug-fix tickets the brainstorm is mental work only.
 
-Run the `superpowers:writing-plans` skill against the validated brainstorming output. The plan goes in `docs/superpowers/plans/<DATE>-<ticket-key>.md`. Do **not** ask the human to approve the plan — proceed directly to execution. The plan is a working document; the human reviews the resulting PR, not the plan itself.
+## Refusal-back (used at any phase if information is missing)
 
-## Phase 3 — Execution
+When you would otherwise need to ask the human a question:
 
-Run the `superpowers:subagent-driven-development` skill over the plan. Standard two-stage review per task (spec compliance → code quality).
+1. Compose a Jira comment listing your unresolved questions as bullet points, prefixed with: `Started work on this but hit ambiguity. Pausing until the ticket is updated:`
+2. Post it: `printf '%s' "<body>" | bin/lib/jira.sh comment <TICKET_KEY>`
+3. Apply the `claude-blocked` label so the poller (`bin/jira-poller`) doesn't re-pick this ticket until the human edits it: `bin/lib/jira.sh label-add <TICKET_KEY> claude-blocked`. The human removes the label after updating the ticket; the poller then re-queues it.
+4. Transition: `bin/lib/jira.sh transition <TICKET_KEY> "Ready For Claude"` (the ticket stays visible to the human, but the label keeps the poller from re-picking it).
+5. Print a one-line summary to stdout (`refused: <reason>`) and exit.
+6. Do not start the dev stack. Do not write a plan. Do not push.
+
+## Phase 2 — Plan
+
+Run `superpowers:writing-plans` against the brainstorm. The plan file goes in `docs/superpowers/plans/<DATE>-<ticket-key-lowercase>.md`. Commit it. Do **not** wait for human plan approval.
+
+## Phase 3 — Execute
+
+Run `superpowers:subagent-driven-development` over the plan. The reviewers are subagents (not humans) — that's fine, run them. If a reviewer finds issues, the implementer subagent fixes and re-reviews. Do not pause for human input between tasks.
+
+If a task hits a problem you genuinely cannot resolve from context (third reviewer iteration with the same blocker, plan is wrong), refuse-back rather than guess.
 
 ## Phase 4 — Deliver
 
 After all tasks pass review:
 
-1. Run the project's validation gauntlet from the worktree root:
+### 4a. Validation gauntlet
 
-   ```bash
-   npx tsc --noEmit && npm run lint && npm run build
-   ```
+```bash
+npx tsc --noEmit && npm run lint && npm run build
+```
 
-   All three must pass. If any fail, fix them — this is execution, not refusal-back territory.
+All three must pass. If any fail and you cannot fix them in another implementer pass, refuse-back.
 
-2. Push the branch:
+### 4b. Push the branch
 
-   ```bash
-   git push -u origin <branch-name>
-   ```
+```bash
+git push -u origin <BRANCH_NAME>
+```
 
-3. Create the PR:
+### 4c. Create the PR
 
-   ```bash
-   gh pr create --title "<TICKET-KEY>: <short summary>" --body "$(cat <<'EOF'
-   ## Summary
-   <2-3 bullet points describing the change>
+```bash
+gh pr create --title "<TICKET_KEY>: <short summary>" --body "$(cat <<'EOF'
+## Summary
+<2-3 bullets describing the change>
 
-   ## Linked ticket
-   <ticket URL from BRIEF.md>
+## Linked ticket
+<ticket URL from BRIEF.md>
 
-   ## Test plan
-   - [ ] Reviewer pulls the branch and runs the local stack (see comment on Jira)
-   - [ ] Reviewer exercises the changed flow
+## Test plan
+- [ ] Reviewer hits the LAN test URL (see Jira comment) and exercises the change
+- [ ] Reviewer confirms no regressions in the surrounding flow
 
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
-   EOF
-   )"
-   ```
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
 
-   Capture the PR URL from `gh`'s output.
+Capture the PR URL printed by `gh`.
 
-4. Start the local dev stack (so the human can test immediately):
+### 4d. Start the local stack
 
-   ```bash
-   docker compose --env-file .env.compose -p <project-name> \
-     -f docker-compose.yml -f .docker/compose.override.yml up -d
-   ```
+Bring up Docker Compose:
 
-5. Post the ready-to-test comment to Jira via `bin/lib/jira.sh comment <TICKET-KEY>` (body via stdin):
+```bash
+docker compose --env-file .env.compose -p <PROJECT_NAME> \
+  -f docker-compose.yml -f .docker/compose.override.yml up -d
+```
 
-   ```
-   PR opened: <pr-url>
+Start the Next.js dev server **detached, bound to all interfaces, surviving session exit**:
 
-   Local test:
-   - Worktree: <abs-worktree-path>
-   - Next.js dev: http://localhost:<NEXT_PORT> (run `npm run dev -- -p <NEXT_PORT>` from the worktree)
-   - DynamoDB: http://localhost:<DDB_PORT>
-   - MinIO Console: http://localhost:<MINIO_CONSOLE_PORT>
+```bash
+nohup npm run dev -- -H 0.0.0.0 -p <NEXT_PORT> > .nextdev.log 2>&1 &
+disown
+```
 
-   Run `docker compose --env-file .env.compose -p <project-name> -f docker-compose.yml -f .docker/compose.override.yml up -d` if the stack is not already running.
-   ```
+Wait for it to come up — poll the LAN URL until 200 OK or 60s elapses:
 
-6. Transition the ticket:
+```bash
+for i in $(seq 1 30); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://<LAN_HOST>:<NEXT_PORT>/" || true)
+  case "$code" in
+    2*|3*) break ;;
+  esac
+  sleep 2
+done
+```
 
-   ```bash
-   bin/lib/jira.sh transition <TICKET-KEY> "In Review"
-   ```
+If after 60s the dev server isn't responding, refuse-back with the dev server log tail as the reason.
 
-   The devotonomy workflow has "In Review" as a valid transition. If for some reason it fails, fall back to leaving the ticket in its current state and warn the user in the final summary.
+### 4e. Post the ready-to-test Jira comment
 
-7. Print a final summary to the session: ticket key, PR URL, worktree path, dev port, status of the Jira transition.
+Body (substitute the placeholders):
 
-## Phase 5 — On hard failure
+```
+PR opened: <pr-url>
 
-If anything in Phase 3 or 4 errors out and you cannot recover:
+Local test (LAN-accessible from any machine on this network):
+- Site: http://<LAN_HOST>:<NEXT_PORT>
+- MinIO console: http://<LAN_HOST>:<MINIO_CONSOLE_PORT> (minioadmin / minioadmin)
+- Dev server log: <WORKTREE_PATH>/.nextdev.log
 
-1. Run `bin/lib/jira.sh comment <TICKET-KEY>` with body: `Automated work failed during <phase>. Last error: <message>. Worktree at <path> left for debugging.`
+Worktree on the dev host: <WORKTREE_PATH>
+Branch: <BRANCH_NAME>
+
+When you're done testing, merge the PR — staging auto-deploys via the existing GitHub Actions workflow. Then run `bin/finish-ticket <TICKET_KEY>` on the dev host to clean up.
+```
+
+Post:
+
+```bash
+printf '%s' "<body>" | bin/lib/jira.sh comment <TICKET_KEY>
+```
+
+### 4f. Transition
+
+```bash
+bin/lib/jira.sh transition <TICKET_KEY> "In Review"
+```
+
+If "In Review" isn't valid for this ticket's current status, the wrapper will list valid transitions — pick the closest forward-progress one. If nothing reasonable is available, leave the ticket as-is and note that in the final summary (no refusal-back here — the work is done, only the transition is cosmetic).
+
+### 4g. Final summary to stdout
+
+One screen, machine-readable-ish:
+
+```
+DONE: <TICKET_KEY>
+PR: <pr-url>
+Test URL: http://<LAN_HOST>:<NEXT_PORT>
+Worktree: <WORKTREE_PATH>
+Jira transition: <state>
+```
+
+Then exit.
+
+## Phase 5 — Hard failure
+
+If anything in Phase 3 or 4 errors out and you cannot recover via another implementer pass or refuse-back:
+
+1. Post Jira comment: `Automated work failed during <phase>. Last error: <one-line message>. Worktree at <WORKTREE_PATH> left intact for debugging. Latest commit on branch: <sha>.`
 2. Do not transition the ticket.
-3. Leave the worktree intact.
-4. Print a clear failure summary and exit.
+3. Leave the worktree and any background dev server intact.
+4. Print `FAILED: <ticket> <reason>` to stdout and exit.
 
 ## Constraints
 
-- Do not run `sst deploy`. The new code lives only on the feature branch and goes to staging via the PR-merge workflow.
-- Do not delete the worktree at the end — the human needs it for local testing.
-- Do not stop the docker stack at the end (Phase 4 leaves it running).
-- Do not commit the `.env.compose`, `.docker/compose.override.yml`, or `BRIEF.md` files — they are gitignored on purpose.
+- Do not run `sst deploy`. The branch goes to staging via the existing PR-merge workflow.
+- Do not delete the worktree.
+- Do not stop the docker stack or kill the dev server.
+- Do not commit `.env.compose`, `.docker/compose.override.yml`, `BRIEF.md`, or `.nextdev.log` (all gitignored).
+- Do not commit secrets ever.

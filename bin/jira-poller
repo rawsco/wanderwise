@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# bin/jira-poller — daemon that watches Jira for tickets in "Ready For Claude"
+# (without the claude-blocked label) and runs the autonomous ticket-work
+# flow on each new ticket it sees.
+#
+# Usage:
+#   bin/jira-poller                  # foreground
+#   nohup bin/jira-poller &          # background
+#   launchctl load ~/Library/LaunchAgents/com.wanderwise.jira-poller.plist
+#                                    # macOS user agent (preferred — see
+#                                    # docs/jira-poller-launchd.md for setup)
+#
+# Configurable via environment:
+#   POLL_INTERVAL_SECONDS  default 60
+#   WANDERWISE_DIR         default ~/ClaudeProjects/wanderwise
+#   POLLER_STATE_DIR       default ~/.cache/wanderwise-poller
+#
+# Loop-prevention:
+#   The autonomous skill applies the `claude-blocked` Jira label when it
+#   refuses-back. The poller's JQL excludes tickets carrying that label, so
+#   refusal doesn't trigger a re-pick. To re-queue a refused ticket, the
+#   human removes the `claude-blocked` label after updating it.
+#
+# Dedupe:
+#   In-flight ticket keys are tracked in $POLLER_STATE_DIR/in-flight.txt.
+#   Entries are removed when the spawned `claude` process exits. Restarting
+#   the poller while a session is mid-flight is safe — the in-flight file
+#   prevents duplicate launches.
+
+set -euo pipefail
+
+POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-60}"
+WANDERWISE_DIR="${WANDERWISE_DIR:-$HOME/ClaudeProjects/wanderwise}"
+POLLER_STATE_DIR="${POLLER_STATE_DIR:-$HOME/.cache/wanderwise-poller}"
+ATLASSIAN_ENV="$HOME/.config/claude/atlassian.env"
+INFLIGHT_FILE="$POLLER_STATE_DIR/in-flight.txt"
+
+JQL='status = "Ready For Claude" AND (labels is EMPTY OR labels not in (claude-blocked))'
+
+mkdir -p "$POLLER_STATE_DIR"
+touch "$INFLIGHT_FILE"
+
+# --- Pre-flight ---
+[ -d "$WANDERWISE_DIR" ] || { echo "WANDERWISE_DIR not found: $WANDERWISE_DIR" >&2; exit 1; }
+[ -x "$WANDERWISE_DIR/bin/start-ticket" ] || { echo "missing $WANDERWISE_DIR/bin/start-ticket" >&2; exit 1; }
+[ -x "$WANDERWISE_DIR/bin/lib/jira.sh" ] || { echo "missing $WANDERWISE_DIR/bin/lib/jira.sh" >&2; exit 1; }
+[ -f "$ATLASSIAN_ENV" ] || { echo "missing $ATLASSIAN_ENV — see plan task 1" >&2; exit 1; }
+for cmd in claude git docker; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "missing required command: $cmd" >&2; exit 1; }
+done
+
+# Source creds so jira.sh inherits them
+set -a; . "$ATLASSIAN_ENV"; set +a
+
+cd "$WANDERWISE_DIR"
+
+log() {
+  printf '%s [poller] %s\n' "$(date -u +%FT%TZ)" "$*"
+}
+
+# Remove a key from in-flight file (atomic via temp + rename).
+remove_inflight() {
+  local key="$1"
+  local tmp
+  tmp=$(mktemp "$POLLER_STATE_DIR/in-flight.XXXXXX")
+  grep -v "^$key\$" "$INFLIGHT_FILE" > "$tmp" || true
+  mv "$tmp" "$INFLIGHT_FILE"
+}
+
+# Spawn a single ticket-work session in the background, and record cleanup
+# in a watcher subshell so the in-flight file gets cleared on exit.
+spawn_ticket_work() {
+  local key="$1"
+  local worktree_dir="$WANDERWISE_DIR/../wanderwise-$key"
+  local log_file="$POLLER_STATE_DIR/$key.log"
+
+  log "starting workspace for $key"
+
+  # Step 1: create the workspace.
+  if ! "$WANDERWISE_DIR/bin/start-ticket" "$key" >> "$log_file" 2>&1; then
+    log "start-ticket failed for $key — see $log_file"
+    remove_inflight "$key"
+    return 1
+  fi
+
+  # Step 2: spawn the autonomous session, detached, with cleanup-on-exit.
+  (
+    cd "$worktree_dir"
+    claude --dangerously-skip-permissions /ticket-work >> "$log_file" 2>&1
+    "$WANDERWISE_DIR/bin/jira-poller" --internal-cleanup "$key" || true
+  ) &
+  disown
+  log "spawned ticket-work for $key (pid $!)"
+}
+
+# Internal mode: clear in-flight entry. Called by the cleanup subshell above
+# from inside the worktree so we don't recurse into a poll loop.
+if [ "${1:-}" = "--internal-cleanup" ]; then
+  shift
+  remove_inflight "${1:?ticket key required}"
+  exit 0
+fi
+
+# --- Main loop ---
+log "poller starting (interval ${POLL_INTERVAL_SECONDS}s, repo $WANDERWISE_DIR)"
+
+while true; do
+  if ! tickets=$("$WANDERWISE_DIR/bin/lib/jira.sh" search "$JQL" 2>/dev/null); then
+    log "search failed — will retry next cycle"
+    sleep "$POLL_INTERVAL_SECONDS"
+    continue
+  fi
+
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    if grep -q "^$key\$" "$INFLIGHT_FILE"; then
+      continue   # already processing this one
+    fi
+    echo "$key" >> "$INFLIGHT_FILE"
+    spawn_ticket_work "$key"
+  done <<< "$tickets"
+
+  sleep "$POLL_INTERVAL_SECONDS"
+done

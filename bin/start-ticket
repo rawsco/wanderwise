@@ -70,6 +70,23 @@ MINIO_API_PORT=$(echo "$PORTS_OUTPUT" | grep ^MINIO_API_PORT= | cut -d= -f2)
 MINIO_CONSOLE_PORT=$(echo "$PORTS_OUTPUT" | grep ^MINIO_CONSOLE_PORT= | cut -d= -f2)
 NEXT_PORT=$(echo "$PORTS_OUTPUT" | grep ^NEXT_PORT= | cut -d= -f2)
 
+# --- Detect LAN host (so the Jira "ready to test" comment is reachable
+#     from another machine on the local network). ---
+LAN_HOST=""
+if command -v ipconfig >/dev/null 2>&1; then
+  for iface in en0 en1 en2 en3; do
+    candidate=$(ipconfig getifaddr "$iface" 2>/dev/null || true)
+    if [ -n "$candidate" ]; then LAN_HOST="$candidate"; break; fi
+  done
+fi
+if [ -z "$LAN_HOST" ] && command -v ip >/dev/null 2>&1; then
+  LAN_HOST=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
+fi
+if [ -z "$LAN_HOST" ]; then
+  LAN_HOST=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+fi
+[ -n "$LAN_HOST" ] || LAN_HOST="localhost"
+
 # --- Worktree ---
 TICKET_LOWER=$(echo "$TICKET" | tr '[:upper:]' '[:lower:]')
 WORKTREE_DIR="../wanderwise-$TICKET"
@@ -102,6 +119,8 @@ cat > "$WORKTREE_DIR/.env.compose" <<ENV
 DDB_PORT=$DDB_PORT
 MINIO_API_PORT=$MINIO_API_PORT
 MINIO_CONSOLE_PORT=$MINIO_CONSOLE_PORT
+NEXT_PORT=$NEXT_PORT
+LAN_HOST=$LAN_HOST
 ENV
 
 # --- .env.local seeded with per-worktree ports ---
@@ -128,12 +147,13 @@ ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
   printf '**URL:** %s\n\n' "$URL"
   printf '**Worktree:** %s\n' "$ABS_WORKTREE"
   printf '**Branch:** %s\n' "$TICKET_LOWER"
-  printf '**Compose project:** %s\n\n' "$PROJECT_NAME"
+  printf '**Compose project:** %s\n' "$PROJECT_NAME"
+  printf '**LAN host:** %s\n\n' "$LAN_HOST"
   printf '**Ports allocated:**\n'
-  printf -- '- Next.js dev: %s\n' "$NEXT_PORT"
+  printf -- '- Next.js dev: %s (test URL: http://%s:%s)\n' "$NEXT_PORT" "$LAN_HOST" "$NEXT_PORT"
   printf -- '- DynamoDB: %s\n' "$DDB_PORT"
   printf -- '- MinIO API: %s\n' "$MINIO_API_PORT"
-  printf -- '- MinIO Console: %s\n\n' "$MINIO_CONSOLE_PORT"
+  printf -- '- MinIO Console: %s (test URL: http://%s:%s)\n\n' "$MINIO_CONSOLE_PORT" "$LAN_HOST" "$MINIO_CONSOLE_PORT"
   printf '## Ticket description\n\n'
   printf '%s\n\n' "$DESCRIPTION"
   printf '## To run the local stack\n\n'
@@ -153,15 +173,15 @@ Workspace ready for $TICKET ($SUMMARY)
   Worktree:        $ABS_WORKTREE
   Branch:          $TICKET_LOWER
   Compose project: $PROJECT_NAME
+  LAN host:        $LAN_HOST
 
-  Next.js dev:     http://localhost:$NEXT_PORT
-  DynamoDB:        http://localhost:$DDB_PORT
-  MinIO API:       http://localhost:$MINIO_API_PORT
-  MinIO Console:   http://localhost:$MINIO_CONSOLE_PORT
+  Next.js dev:     http://$LAN_HOST:$NEXT_PORT
+  DynamoDB:        http://$LAN_HOST:$DDB_PORT
+  MinIO API:       http://$LAN_HOST:$MINIO_API_PORT
+  MinIO Console:   http://$LAN_HOST:$MINIO_CONSOLE_PORT
 
-Next:
+Next (autonomous, no permission prompts):
   cd $WORKTREE_DIR
-  claude
-  /ticket-work
+  claude --dangerously-skip-permissions /ticket-work
 
 SUMMARY
