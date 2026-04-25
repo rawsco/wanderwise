@@ -1,0 +1,46 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# OIDC requires id-token: write. contents: read is enough for checkout.
+permissions:
+  id-token: write
+  contents: read
+
+# Queue deploys; never cancel a deploy mid-flight — CloudFormation can
+# end up stuck in UPDATE_IN_PROGRESS if a stack update is interrupted.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # `environment: staging` is load-bearing: it sets the OIDC sub-claim to
+    # `repo:rawsco/wanderwise:environment:staging`, which is required by the
+    # IAM trust policy on workflow_dispatch runs. It also gates the run in
+    # the GitHub UI if approval rules are added later.
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-2
+          role-session-name: deploy-staging-${{ github.run_id }}
+
+      - name: Deploy
+        run: npx sst deploy --stage staging
