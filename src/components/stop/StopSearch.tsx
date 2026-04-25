@@ -10,7 +10,7 @@ import { Plus, Loader2, X } from "lucide-react";
 
 interface StopSearchProps {
   tripId: string;
-  onStopAdded: (stop: { stopId: string; tripId: string; name: string; address: string; lat: number; lng: number; order: number; arrivalDate?: string; departureDate?: string; checkInTime?: string; checkOutTime?: string }) => void;
+  onStopAdded: (stop: { stopId: string; tripId: string; name: string; address: string; lat: number; lng: number; order: number; kind?: "start" | "intermediate" | "end"; arrivalDate?: string; departureDate?: string; checkInTime?: string; checkOutTime?: string }) => void;
   placeholder?: string;
   showDates?: boolean;
   defaultArrivalDate?: string;
@@ -49,6 +49,7 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
   const [checkInTime, setCheckInTime] = useState("");
   const [checkOutTime, setCheckOutTime] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   defaultArrivalRef.current = defaultArrivalDate;
   tripEndRef.current = tripEndDate;
@@ -101,19 +102,22 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
 
   async function addStop() {
     if (!pending) return;
+    if (!arrivalDate) {
+      setError("Pick an arrival date.");
+      return;
+    }
+    setError(null);
     setSaving(true);
 
     const departureDate =
-      arrivalDate && nights !== "" && nights > 0
-        ? addNights(arrivalDate, nights)
-        : undefined;
+      nights !== "" && nights > 0 ? addNights(arrivalDate, nights) : undefined;
 
     const res = await fetch(`/api/trips/${tripId}/stops`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...pending,
-        arrivalDate: arrivalDate || undefined,
+        arrivalDate,
         departureDate,
         checkInTime: checkInTime || undefined,
         checkOutTime: checkOutTime || undefined,
@@ -123,6 +127,9 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
       const stop = await res.json();
       onStopAdded(stop);
       clearPending();
+    } else {
+      const body = await res.json().catch(() => null);
+      setError(typeof body?.error === "string" ? body.error : "Couldn't add the stop.");
     }
     setSaving(false);
   }
@@ -199,6 +206,8 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
               </div>
             </div>
           )}
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
 
           <Button onClick={addStop} disabled={saving} className="w-full h-11 text-sm">
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}

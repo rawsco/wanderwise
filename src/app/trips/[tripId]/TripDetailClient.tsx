@@ -18,6 +18,7 @@ interface Stop {
   stopId: string;
   tripId: string;
   order: number;
+  kind?: "start" | "intermediate" | "end";
   name: string;
   address: string;
   lat: number;
@@ -45,42 +46,25 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
   const [stops, setStops] = useState<Stop[]>(initialStops);
   const [segments, setSegments] = useState<Segment[]>([]);
 
-  // Suggest arrival = last middle stop's departure (or trip start date)
+  // Suggest arrival = last intermediate stop's departure, otherwise trip start.
   const suggestedArrivalDate = useMemo(() => {
-    for (let i = stops.length - 2; i >= 0; i--) {
-      if (stops[i].departureDate) return stops[i].departureDate;
+    const intermediates = stops.filter(s => s.kind === "intermediate");
+    for (let i = intermediates.length - 1; i >= 0; i--) {
+      if (intermediates[i].departureDate) return intermediates[i].departureDate;
     }
     return tripStartDate;
   }, [stops, tripStartDate]);
 
   const bookedRanges = useMemo(() => {
-    const middle = stops.length > 2 ? stops.slice(1, -1) : [];
-    return middle
+    return stops
+      .filter(s => s.kind === "intermediate")
       .filter(s => s.arrivalDate && s.departureDate)
       .map(s => ({ from: s.arrivalDate!, to: s.departureDate! }));
   }, [stops]);
 
   const handleStopAdded = useCallback((stop: Stop) => {
-    setStops(prev => {
-      const appended = [...prev, { ...stop, order: prev.length }];
-      if (prev.length >= 2) {
-        const last = appended.length - 1;
-        const mid = last - 1;
-        [appended[last], appended[mid]] = [appended[mid], appended[last]];
-        const updated = appended.map((s, i) => ({ ...s, order: i }));
-        fetch(`/api/trips/${tripId}/stops/${updated[mid].stopId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: mid }),
-        });
-        fetch(`/api/trips/${tripId}/stops/${updated[last].stopId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ order: last }),
-        });
-        return sortStopsByDate(updated);
-      }
-      return appended;
-    });
-  }, [tripId]);
+    setStops(prev => sortStopsByDate([...prev, stop]));
+  }, []);
 
   const handleRemove = useCallback(async (stopId: string) => {
     await fetch(`/api/trips/${tripId}/stops/${stopId}`, { method: "DELETE" });
@@ -170,40 +154,14 @@ export function TripDetailClient({ tripId, initialStops, tripStartDate, tripEndD
     localStorage.setItem(PANEL_STORAGE_KEY, String(panelWidth));
   }, [panelWidth, dragging]);
 
-  // Labels and date visibility based on what's being added
-  const isAddingStart = stops.length === 0;
-  const isAddingEnd = stops.length === 1;
-  const showDates = !isAddingStart && !isAddingEnd;
-
-  const searchLabel = isAddingStart
-    ? "Starting point"
-    : isAddingEnd
-    ? "End destination"
-    : "Add a stop";
-
-  const searchHint = isAddingStart
-    ? "Where are you departing from?"
-    : isAddingEnd
-    ? "Where is the trip heading?"
-    : undefined;
-
-  const searchPlaceholder = isAddingStart
-    ? "Search your start location…"
-    : isAddingEnd
-    ? "Search your destination…"
-    : "Search for a place to stay…";
-
   const routePanel = (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{searchLabel}</p>
-        {searchHint && <p className="text-xs text-gray-400 mb-2">{searchHint}</p>}
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Add a stop</p>
         <StopSearch
-          key={searchLabel}
           tripId={tripId}
           onStopAdded={handleStopAdded}
-          placeholder={searchPlaceholder}
-          showDates={showDates}
+          placeholder="Search for a place to stay…"
           defaultArrivalDate={suggestedArrivalDate}
           tripStartDate={tripStartDate}
           tripEndDate={tripEndDate}

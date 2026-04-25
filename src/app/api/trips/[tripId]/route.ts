@@ -40,9 +40,40 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ tripId
     const body = await req.json();
     const data = updateSchema.parse(body);
 
+    // Authorise the trip belongs to this user before touching anchor stops.
+    const owned = await TripEntity.query.byUser({ userId: user.id })
+      .where(({ tripId: tid }, { eq }) => eq(tid, tripId))
+      .go();
+    if (!owned.data[0]) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     await TripEntity.update({ userId: user.id, tripId })
       .set({ ...data, updatedAt: new Date().toISOString() })
       .go();
+
+    // If the trip's start/end dates moved, propagate to the anchor stops.
+    if (data.startDate || data.endDate) {
+      const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
+      const updates: Promise<unknown>[] = [];
+      for (const stop of stopsResult.data) {
+        if (stop.kind === "start" && data.startDate && stop.arrivalDate !== data.startDate) {
+          updates.push(
+            StopEntity.update({ tripId, stopId: stop.stopId })
+              .set({ arrivalDate: data.startDate })
+              .go()
+          );
+        }
+        if (stop.kind === "end" && data.endDate && stop.arrivalDate !== data.endDate) {
+          updates.push(
+            StopEntity.update({ tripId, stopId: stop.stopId })
+              .set({ arrivalDate: data.endDate })
+              .go()
+          );
+        }
+      }
+      await Promise.all(updates);
+    }
 
     return NextResponse.json({ tripId, ...data });
   } catch (err) {
