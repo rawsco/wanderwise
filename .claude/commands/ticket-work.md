@@ -120,6 +120,14 @@ docker compose --env-file .env.compose -p <PROJECT_NAME> \
   -f docker-compose.yml -f .docker/compose.override.yml up -d
 ```
 
+Bootstrap the fresh stack (idempotent — creates the DynamoDB table and MinIO bucket if they don't exist yet, no-op otherwise):
+
+```bash
+bin/lib/bootstrap-stack.sh
+```
+
+If this fails, **refuse-back** with the script's stderr as the reason. Without it, NextAuth's `signIn` callback hits an empty DynamoDB Local and dies with `Cannot do operations on a non-existent table`, redirecting to `/api/auth/error` — exactly what we'd be telling the human is "ready to test". The script polls DDB and MinIO for up to 30s each, so transient docker-startup races are absorbed.
+
 Start the Next.js dev server **detached, bound to all interfaces, over HTTPS, surviving session exit**:
 
 ```bash
