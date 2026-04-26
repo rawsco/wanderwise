@@ -23,4 +23,14 @@ const stops = result.data; // Stop[]
 
 **Entity key structure.** Stops use `tripId` as PK and `stopId` as SK (see `byTrip` index). Always query stops via `StopEntity.query.byTrip({ tripId })` — never scan the table.
 
-**Table is provisioned by SST**, not at runtime. Per-stage tables (`wanderwise-{stage}`) are defined in `sst.config.ts`. Local dev with DynamoDB Local: `docker compose up -d` starts the container; the local table is created by SST's `sst dev` command (or manually if running raw `npm run dev`).
+**Table is provisioned by SST** in cloud stages, not at runtime. Per-stage tables (`wanderwise-{stage}`) are defined in `sst.config.ts`.
+
+For local dev with DynamoDB Local (`docker compose up -d`), the table is **not** auto-created. Run `bin/lib/bootstrap-stack.sh` from the repo (or worktree) root after `docker compose up`. The script:
+- Polls DynamoDB Local + MinIO for up to 30 s each so transient startup races are absorbed.
+- Creates the DynamoDB table (`pk`/`sk` + GSI1) using the same schema as `sst.config.ts`.
+- Creates the MinIO bucket.
+- Idempotent — re-running treats `ResourceInUseException` / `BucketAlreadyOwnedByYou` as success.
+
+`bin/start-ticket` worktrees: the autonomous skill (`.claude/commands/ticket-work.md` Phase 4d) runs the script automatically after starting Docker, before the dev server. If you spin up a worktree manually, run it yourself.
+
+The symptom if you skip it: login succeeds in Cognito but the auth callback throws `Cannot do operations on a non-existent table` and redirects to `/api/auth/error`.

@@ -29,7 +29,7 @@ Copy `.env.local.example` to `.env.local` before running locally and fill in `NE
 
 **Auth:** NextAuth v4 Credentials provider, JWT strategy. `role` and `id` added to the JWT in `src/lib/auth.ts` and exposed on `session.user`. Session type is augmented in `src/types/next-auth.d.ts`.
 
-**Database:** Single DynamoDB table, all entities managed via ElectroDB. Table is auto-created on first request by `src/lib/db/bootstrap.ts`. Local dev uses `DYNAMODB_ENDPOINT` env var pointing to the Docker container.
+**Database:** Single DynamoDB table, all entities managed via ElectroDB. In cloud stages the table is provisioned by SST (`sst.config.ts`). For local dev, the table must be created in DynamoDB Local on first run or after wiping the docker volume — run `bin/lib/bootstrap-stack.sh` from the repo (or worktree) root after `docker compose up -d`. The script is idempotent and also creates the MinIO bucket. `DYNAMODB_ENDPOINT` env var points to the Docker container.
 
 **Storage:** AWS S3 in production, MinIO locally. Sharp resizes profile avatars into small/medium/large variants server-side before upload. All S3 operations go through `src/lib/s3.ts`.
 
