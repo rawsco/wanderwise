@@ -96,12 +96,18 @@ export default $config({
 
     // Per-worktree dev servers (spawned by bin/start-ticket) bind to a LAN
     // IP so other devices can hit them. Cognito does an exact-match check
-    // on redirect_uri, so each candidate URL must be pre-registered. Set
-    // WANDERWISE_LAN_DEV_HOST to your machine's LAN IP (e.g. 192.168.50.155)
-    // before running `sst deploy --stage dev` so worktree ports 3100..3119
-    // are accepted as OAuth redirect targets. The range matches what
-    // bin/lib/ports.sh allocates from (base 3100). Without this, auth in
-    // the worktree test env fails with a redirect_mismatch error.
+    // on redirect_uri AND requires https for any host other than localhost
+    // (`InvalidParameterException: cannot use the HTTP protocol`). The
+    // worktree dev server therefore runs `next dev --experimental-https`
+    // (driven by .claude/commands/ticket-work.md Phase 4d) which serves a
+    // self-signed cert; testers click through the browser warning once per
+    // device per origin.
+    //
+    // Set WANDERWISE_LAN_DEV_HOST to your machine's LAN IP (e.g.
+    // 192.168.50.155) before running `sst deploy --stage dev` so worktree
+    // ports 3100..3119 are accepted as OAuth redirect targets. The range
+    // matches what bin/lib/ports.sh allocates from (base 3100). Without
+    // this, auth in the worktree test env fails with redirect_mismatch.
     const lanDevHost = process.env.WANDERWISE_LAN_DEV_HOST;
     const devCallbackUrls = [
       "http://localhost:3000/api/auth/callback/cognito",
@@ -109,14 +115,17 @@ export default $config({
         ? Array.from(
             { length: 20 },
             (_, i) =>
-              `http://${lanDevHost}:${3100 + i}/api/auth/callback/cognito`,
+              `https://${lanDevHost}:${3100 + i}/api/auth/callback/cognito`,
           )
         : []),
     ];
     const devLogoutUrls = [
       "http://localhost:3000",
       ...(lanDevHost
-        ? Array.from({ length: 20 }, (_, i) => `http://${lanDevHost}:${3100 + i}`)
+        ? Array.from(
+            { length: 20 },
+            (_, i) => `https://${lanDevHost}:${3100 + i}`,
+          )
         : []),
     ];
 

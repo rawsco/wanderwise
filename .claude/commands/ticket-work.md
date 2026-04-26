@@ -120,18 +120,20 @@ docker compose --env-file .env.compose -p <PROJECT_NAME> \
   -f docker-compose.yml -f .docker/compose.override.yml up -d
 ```
 
-Start the Next.js dev server **detached, bound to all interfaces, surviving session exit**:
+Start the Next.js dev server **detached, bound to all interfaces, over HTTPS, surviving session exit**:
 
 ```bash
-nohup npm run dev -- -H 0.0.0.0 -p <NEXT_PORT> > .nextdev.log 2>&1 &
+nohup npm run dev -- --experimental-https -H 0.0.0.0 -p <NEXT_PORT> > .nextdev.log 2>&1 &
 disown
 ```
 
-Wait for it to come up — poll an auth-sensitive endpoint until 200 OK or 60s elapses. We probe `/api/auth/csrf` rather than `/` because `/` returns 200 even when `NEXTAUTH_SECRET` is missing or `COGNITO_*` is misconfigured, so a green `/` masks a broken test env. `/api/auth/csrf` only returns 200 when NextAuth has a secret to mint a CSRF token with:
+`--experimental-https` is required because Cognito refuses non-`https` callback URLs for any host except `localhost` — without it auth fails with `redirect_mismatch` even when the URL is pre-registered. Next.js auto-generates a self-signed cert at `.next/certificates/` on first boot.
+
+Wait for it to come up — poll an auth-sensitive endpoint until 200 OK or 60s elapses. Use `-k` so curl ignores the self-signed cert. We probe `/api/auth/csrf` rather than `/` because `/` returns 200 even when `NEXTAUTH_SECRET` is missing or `COGNITO_*` is misconfigured, so a green `/` masks a broken test env. `/api/auth/csrf` only returns 200 when NextAuth has a secret to mint a CSRF token with:
 
 ```bash
 for i in $(seq 1 30); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://<LAN_HOST>:<NEXT_PORT>/api/auth/csrf" || true)
+  code=$(curl -k -s -o /dev/null -w '%{http_code}' --max-time 2 "https://<LAN_HOST>:<NEXT_PORT>/api/auth/csrf" || true)
   case "$code" in
     2*|3*) break ;;
   esac
