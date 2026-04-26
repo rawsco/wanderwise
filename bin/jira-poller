@@ -76,17 +76,30 @@ spawn_ticket_work() {
 
   log "starting workspace for $key"
 
-  # Step 1: create the workspace.
+  # Step 1: transition the ticket to In Progress so the human can see at a
+  # glance that the poller has claimed it. Best-effort — if the transition
+  # fails (workflow mismatch, transient Jira error), log and carry on.
+  if ! "$WANDERWISE_DIR/bin/lib/jira.sh" transition "$key" "In Progress" >> "$log_file" 2>&1; then
+    log "warning: could not transition $key to In Progress — see $log_file"
+  fi
+
+  # Step 2: create the workspace.
   if ! "$WANDERWISE_DIR/bin/start-ticket" "$key" >> "$log_file" 2>&1; then
-    log "start-ticket failed for $key — see $log_file"
+    log "start-ticket failed for $key — labelling claude-blocked and giving up"
+    "$WANDERWISE_DIR/bin/lib/jira.sh" label-add "$key" claude-blocked \
+      >> "$log_file" 2>&1 || log "warning: also failed to label $key"
     remove_inflight "$key"
     return 1
   fi
 
-  # Step 2: spawn the autonomous session, detached, with cleanup-on-exit.
+  # Step 3: spawn the autonomous session, detached, with cleanup-on-exit.
+  # Use `claude -p "/ticket-work"` (non-interactive print mode); the previous
+  # `claude --dangerously-skip-permissions /ticket-work` opened the
+  # interactive TUI which exited immediately under the disowned subshell
+  # (no TTY) without ever running the slash command.
   (
     cd "$worktree_dir"
-    claude --dangerously-skip-permissions /ticket-work >> "$log_file" 2>&1
+    claude -p "/ticket-work" --dangerously-skip-permissions >> "$log_file" 2>&1
     "$WANDERWISE_DIR/bin/jira-poller" --internal-cleanup "$key" || true
   ) &
   disown

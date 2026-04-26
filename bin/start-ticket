@@ -56,10 +56,14 @@ URL=$(echo "$TICKET_JSON" | jq -r .url)
 
 if [ "$STATUS" = "Done" ] || [ "$STATUS" = "Closed" ]; then
   echo "Ticket $TICKET is $STATUS — refusing to start work." >&2
+  "$BIN_DIR/lib/jira.sh" label-add "$TICKET" claude-blocked >/dev/null 2>&1 || \
+    echo "warning: failed to label $TICKET claude-blocked" >&2
   exit 1
 fi
 if [ -z "$DESCRIPTION" ] || [ "$DESCRIPTION" = "null" ]; then
   echo "Ticket $TICKET has no description — refusing." >&2
+  "$BIN_DIR/lib/jira.sh" label-add "$TICKET" claude-blocked >/dev/null 2>&1 || \
+    echo "warning: failed to label $TICKET claude-blocked" >&2
   exit 1
 fi
 
