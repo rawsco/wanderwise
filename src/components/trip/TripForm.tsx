@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import Link from "next/link";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 
@@ -63,11 +64,12 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
   const [endLocation, setEndLocation] = useState<Anchor | null>(defaultValues?.endLocation ?? null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, control, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(baseSchema) as any,
     defaultValues,
   });
+  const startDateValue = watch("startDate");
 
   function toggleMember(id: string) {
     setMemberIds(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
@@ -120,14 +122,37 @@ function TripFormInner({ tripId, defaultValues, profiles }: TripFormProps) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label htmlFor="startDate">Start date</Label>
-          <Input id="startDate" type="date" {...register("startDate")} />
+          <Controller
+            control={control}
+            name="startDate"
+            render={({ field }) => (
+              <DateInput
+                id="startDate"
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
           {errors.startDate && <p className="text-xs text-red-500">{errors.startDate.message}</p>}
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label htmlFor="endDate">End date</Label>
-          <Input id="endDate" type="date" {...register("endDate")} />
+          <Controller
+            control={control}
+            name="endDate"
+            render={({ field }) => (
+              <DateInput
+                id="endDate"
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                min={startDateValue || undefined}
+              />
+            )}
+          />
           {errors.endDate && <p className="text-xs text-red-500">{errors.endDate.message}</p>}
         </div>
       </div>
