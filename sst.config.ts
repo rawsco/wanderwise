@@ -179,6 +179,9 @@ export default $config({
         NEXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
         NEXTAUTH_URL: appUrl,
         NEXTAUTH_SECRET: nextAuthSecret.value,
+        // NEXT_PUBLIC_ vars must be in `environment` (not just `link`) so
+        // Next.js can inline them into the client bundle at build time.
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: googleMapsKey.value,
       },
     });
 
