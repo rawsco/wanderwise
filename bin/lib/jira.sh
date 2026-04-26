@@ -33,6 +33,7 @@ Usage:
   jira.sh search <JQL>
   jira.sh label-add <KEY> <LABEL>
   jira.sh label-remove <KEY> <LABEL>
+  jira.sh ready-for-review <KEY> <PR_URL>
 EOF
   exit 2
 }
@@ -125,6 +126,49 @@ Call jira_put with path "/rest/api/3/issue/$key" and body
 
 After succeeding, reply with the single word "OK".
 EOF
+    ;;
+  ready-for-review)
+    [ $# -eq 2 ] || usage
+    key="$1"
+    pr_url="$2"
+
+    if [ ! -f .env.compose ]; then
+      echo "ready-for-review: .env.compose not found in $(pwd)" >&2
+      exit 1
+    fi
+    # shellcheck disable=SC1091
+    set -a; . ./.env.compose; set +a
+
+    worktree_path=$(pwd)
+    branch_name=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+    # Compose body with printf rather than $(cat <<EOF) — avoids bash's
+    # quirk where apostrophes inside a heredoc nested in $(...) confuse
+    # the parser into hunting for an unmatched single quote.
+    body=$(printf '%s\n' \
+      "PR opened: $pr_url" \
+      "" \
+      "Local test (LAN-accessible from any machine on this network):" \
+      "- Site: http://$LAN_HOST:$NEXT_PORT" \
+      "- MinIO console: http://$LAN_HOST:$MINIO_CONSOLE_PORT (minioadmin / minioadmin)" \
+      "- Dev server log: $worktree_path/.nextdev.log" \
+      "" \
+      "Worktree on the dev host: $worktree_path" \
+      "Branch: $branch_name" \
+      "" \
+      "When you are done testing, merge the PR — staging auto-deploys via the existing GitHub Actions workflow. Then run bin/finish-ticket $key on the dev host to clean up.")
+
+    comment_rc=0
+    transition_rc=0
+    printf '%s' "$body" | "$0" comment "$key" || comment_rc=$?
+    "$0" transition "$key" "In Review" || transition_rc=$?
+
+    if [ "$comment_rc" -eq 0 ] && [ "$transition_rc" -eq 0 ]; then
+      echo "OK"
+    else
+      echo "PARTIAL: comment=$comment_rc transition=$transition_rc" >&2
+      exit 1
+    fi
     ;;
   *)
     usage
