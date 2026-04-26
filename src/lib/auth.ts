@@ -2,25 +2,32 @@ import type { NextAuthOptions } from "next-auth";
 import CognitoProvider from "next-auth/providers/cognito";
 import { UserEntity } from "./db/user.entity";
 
-const isProd = process.env.NODE_ENV === "production";
-const cookiePrefix = isProd ? "__Secure-" : "";
+// Gate cookie naming on the URL protocol, not on NODE_ENV. NextAuth's
+// middleware (`getToken({ req })` inside withAuth) infers cookie name from
+// request protocol — HTTPS → look for `__Secure-` prefix. If we keyed off
+// NODE_ENV instead, the cookie write (no prefix in dev) and the cookie read
+// (with prefix because URL is HTTPS) disagreed and middleware never saw the
+// session, infinite-redirect-looping the user back to /login. Bug surfaced
+// when worktree dev envs moved to HTTPS for Cognito compatibility.
+const useSecure = (process.env.NEXTAUTH_URL ?? "").startsWith("https://");
+const cookiePrefix = useSecure ? "__Secure-" : "";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
-  useSecureCookies: isProd,
+  useSecureCookies: useSecure,
   cookies: {
     sessionToken: {
       name: `${cookiePrefix}next-auth.session-token`,
-      options: { httpOnly: true, sameSite: "lax", path: "/", secure: isProd },
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: useSecure },
     },
     callbackUrl: {
       name: `${cookiePrefix}next-auth.callback-url`,
-      options: { sameSite: "lax", path: "/", secure: isProd },
+      options: { sameSite: "lax", path: "/", secure: useSecure },
     },
     csrfToken: {
       name: `${cookiePrefix}next-auth.csrf-token`,
-      options: { httpOnly: true, sameSite: "lax", path: "/", secure: isProd },
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: useSecure },
     },
   },
   providers: [
