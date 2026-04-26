@@ -1,7 +1,7 @@
 "use client";
 
-import { Map, Marker, Polyline, InfoWindow } from "@vis.gl/react-google-maps";
-import { useState } from "react";
+import { Map, Marker, Polyline, InfoWindow, useMap } from "@vis.gl/react-google-maps";
+import { useEffect, useState } from "react";
 
 interface Stop {
   stopId: string;
@@ -74,6 +74,44 @@ function isSamePlace(a: Stop, b: Stop): boolean {
   return Math.abs(a.lat - b.lat) < 0.005 && Math.abs(a.lng - b.lng) < 0.005;
 }
 
+const SINGLE_STOP_ZOOM = 12;
+const FIT_PADDING_PX = 64;
+
+function FitToStops({ stops }: { stops: Stop[] }) {
+  const map = useMap();
+  // Re-fit only when positions change, so date/booking edits don't snap the
+  // user out of any pan/zoom they have done manually.
+  const positionKey = stops.map(s => `${s.lat.toFixed(5)},${s.lng.toFixed(5)}`).join("|");
+
+  useEffect(() => {
+    if (!map || stops.length === 0) return;
+
+    if (stops.length === 1) {
+      map.setCenter({ lat: stops[0].lat, lng: stops[0].lng });
+      map.setZoom(SINGLE_STOP_ZOOM);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    for (const s of stops) {
+      bounds.extend({ lat: s.lat, lng: s.lng });
+    }
+
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    if (Math.abs(ne.lat() - sw.lat()) < 0.005 && Math.abs(ne.lng() - sw.lng()) < 0.005) {
+      map.setCenter({ lat: stops[0].lat, lng: stops[0].lng });
+      map.setZoom(SINGLE_STOP_ZOOM);
+      return;
+    }
+
+    map.fitBounds(bounds, FIT_PADDING_PX);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, positionKey]);
+
+  return null;
+}
+
 export function TripMap({ stops }: TripMapProps) {
   const [activeStop, setActiveStop] = useState<string | null>(null);
 
@@ -101,6 +139,7 @@ export function TripMap({ stops }: TripMapProps) {
       className="w-full h-full rounded-xl"
       gestureHandling="greedy"
     >
+      <FitToStops stops={stops} />
       {stops.map((stop, i) => {
         const icon = iconForStop(i);
         if (icon === null) return null;
