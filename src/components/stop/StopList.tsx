@@ -266,7 +266,6 @@ function StopItem({
                     min={tripStartDate}
                     max={tripEndDate}
                     disabledRanges={disabledRanges}
-                    placeholder="Select date"
                   />
                 </div>
                 <div className="space-y-0.5 min-w-0">

@@ -182,7 +182,6 @@ export function StopSearch({ tripId, onStopAdded, placeholder = "Search for a pl
                   min={tripStartDate}
                   max={tripEndDate}
                   disabledRanges={disabledRanges}
-                  placeholder="Select date"
                 />
               </div>
               <div className="space-y-1 min-w-0">
