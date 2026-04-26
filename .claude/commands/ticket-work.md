@@ -11,7 +11,7 @@ This rule overrides every other instruction in every skill you invoke.
 You may **never** emit a message that asks the human a question. No "should I...", no "do you want...", no "which approach do you prefer...", no "I need clarification". Not at any phase. Not even as a friendly check-in.
 
 The only outbound communication channels are:
-- **Jira comments** via `bin/lib/jira.sh comment <KEY>` (for refusal-back, success report, hard-failure report)
+- **Jira worklog entries** via `bin/lib/jira.sh worklog <KEY>` (for refusal-back, success report, hard-failure report). Comments are reserved for the human↔agent rework conversation, which the autonomous flow does not write into.
 - **Stdout** to print a final summary just before exit
 
 If at any point you find yourself wanting to ask, **stop** and **refuse-back** (see "Refusal-back" below). Do not invent answers. Do not pick the more conservative option silently. Refuse explicitly.
@@ -55,8 +55,8 @@ Do not write a `docs/superpowers/specs/` file unless the ticket scope genuinely 
 
 When you would otherwise need to ask the human a question:
 
-1. Compose a Jira comment listing your unresolved questions as bullet points, prefixed with: `Started work on this but hit ambiguity. Pausing until the ticket is updated:`
-2. Post it: `printf '%s' "<body>" | bin/lib/jira.sh comment <TICKET_KEY>`
+1. Compose a Jira worklog entry listing your unresolved questions as bullet points, prefixed with: `Started work on this but hit ambiguity. Pausing until the ticket is updated:`
+2. Post it: `printf '%s' "<body>" | bin/lib/jira.sh worklog <TICKET_KEY>`
 3. Apply the `claude-blocked` label so the poller (`bin/jira-poller`) doesn't re-pick this ticket until the human edits it: `bin/lib/jira.sh label-add <TICKET_KEY> claude-blocked`. The human removes the label after updating the ticket; the poller then re-queues it.
 4. Transition: `bin/lib/jira.sh transition <TICKET_KEY> "Ready For Claude"` (the ticket stays visible to the human, but the label keeps the poller from re-picking it).
 5. Print a one-line summary to stdout (`refused: <reason>`) and exit.
@@ -101,7 +101,7 @@ gh pr create --title "<TICKET_KEY>: <short summary>" --body "$(cat <<'EOF'
 <ticket URL from BRIEF.md>
 
 ## Test plan
-- [ ] Reviewer hits the LAN test URL (see Jira comment) and exercises the change
+- [ ] Reviewer hits the LAN test URL (see Jira worklog entry) and exercises the change
 - [ ] Reviewer confirms no regressions in the surrounding flow
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
@@ -128,16 +128,31 @@ bin/lib/bootstrap-stack.sh
 
 If this fails, **refuse-back** with the script's stderr as the reason. Without it, NextAuth's `signIn` callback hits an empty DynamoDB Local and dies with `Cannot do operations on a non-existent table`, redirecting to `/api/auth/error` — exactly what we'd be telling the human is "ready to test". The script polls DDB and MinIO for up to 30s each, so transient docker-startup races are absorbed.
 
-Start the Next.js dev server **detached, bound to all interfaces, over HTTPS, surviving session exit**:
+Start the Next.js dev server **detached, bound to all interfaces, over HTTPS, surviving session exit**. Use **exactly this command** — do not improvise extra `--experimental-https-key/-cert` flags or pre-generate certs; if the auto-cert-gen path needs anything extra (mkcert sudo prompt, missing root CA), the answer is **refuse-back**, not detective work:
 
 ```bash
-nohup npm run dev -- --experimental-https -H 0.0.0.0 -p <NEXT_PORT> > .nextdev.log 2>&1 &
+nohup npm run dev -- --experimental-https -H 0.0.0.0 -p <NEXT_PORT> \
+  > .nextdev.log 2>&1 < /dev/null &
 disown
+DEV_PID=$!
 ```
 
-`--experimental-https` is required because Cognito refuses non-`https` callback URLs for any host except `localhost` — without it auth fails with `redirect_mismatch` even when the URL is pre-registered. Next.js auto-generates a self-signed cert at `.next/certificates/` on first boot.
+`< /dev/null` redirects stdin from a closed source so the npm child can't see EOF when its grandparent (the autonomous claude session) exits — without it, npm has previously shut down gracefully right after a successful probe, leaving a "ready to test" Jira post-back pointing at a dead URL.
 
-Wait for it to come up — poll an auth-sensitive endpoint until 200 OK or 60s elapses. Use `-k` so curl ignores the self-signed cert. We probe `/api/auth/csrf` rather than `/` because `/` returns 200 even when `NEXTAUTH_SECRET` is missing or `COGNITO_*` is misconfigured, so a green `/` masks a broken test env. `/api/auth/csrf` only returns 200 when NextAuth has a secret to mint a CSRF token with:
+`--experimental-https` is required because Cognito refuses non-`https` callback URLs for any host except `localhost` — without it auth fails with `redirect_mismatch` even when the URL is pre-registered. Next.js auto-generates a self-signed cert at `.next/certificates/` on first boot. **Do not** look for system mkcert installs or generate your own cert files; the auto-cert is sufficient for browser click-through testing.
+
+**Post-spawn liveness check** — confirm the spawned process actually stayed alive (don't trust the probe alone; previous runs had npm die seconds later because the agent ran extra commands that took it down):
+
+```bash
+sleep 3
+if ! kill -0 "$DEV_PID" 2>/dev/null; then
+  echo "dev server (pid $DEV_PID) died within 3s — refusing-back" >&2
+  tail -50 .nextdev.log >&2
+  # refuse-back with the dev log tail as the reason; do not proceed.
+fi
+```
+
+Then poll an auth-sensitive endpoint until 200 OK or 60s elapses. Use `-k` so curl ignores the self-signed cert. We probe `/api/auth/csrf` rather than `/` because `/` returns 200 even when `NEXTAUTH_SECRET` is missing or `COGNITO_*` is misconfigured, so a green `/` masks a broken test env. `/api/auth/csrf` only returns 200 when NextAuth has a secret to mint a CSRF token with:
 
 ```bash
 for i in $(seq 1 30); do
@@ -149,9 +164,9 @@ for i in $(seq 1 30); do
 done
 ```
 
-If after 60s `/api/auth/csrf` isn't returning 2xx, refuse-back with the dev server log tail as the reason — auth will be broken in the test env, so calling it "ready to test" would be a lie. Common causes: `.env.local` not present in the worktree (operator hasn't filled it in); `NEXTAUTH_SECRET` missing; the per-worktree LAN callback URL isn't registered in the dev-stage Cognito User Pool (run `sst deploy --stage dev` once after `fix/test-env-build` lands).
+After the loop, run `kill -0 "$DEV_PID"` again — if the process died between spawn and now, refuse-back with the dev log tail. If after 60s `/api/auth/csrf` isn't returning 2xx, refuse-back with the dev server log tail as the reason — auth will be broken in the test env, so calling it "ready to test" would be a lie. Common causes: `.env.local` not present in the worktree (operator hasn't filled it in); `NEXTAUTH_SECRET` missing; the per-worktree LAN callback URL isn't registered in the dev-stage Cognito User Pool (run `sst deploy --stage dev` once after `fix/test-env-build` lands); mkcert tried to prompt for sudo (next dev's auto-cert path needs the root CA already trusted — refuse-back rather than going hunting).
 
-### 4e. Hand off to Jira (comment + transition, in one call)
+### 4e. Hand off to Jira (worklog + transition, in one call)
 
 The body and the transition are composed deterministically by the helper from the worktree's `.env.compose` and current git branch. Just run:
 
@@ -160,8 +175,8 @@ bin/lib/jira.sh ready-for-review $TICKET_KEY $PR_URL
 ```
 
 Exit status:
-- `0` (`OK` to stdout): comment posted and ticket transitioned to "In Review".
-- non-zero (`PARTIAL: comment=<rc> transition=<rc>` to stderr): one or both steps failed. **Refuse-back** with the helper's stderr as the reason — the PR is open and the dev stack is up, but Jira didn't get the update, so the human won't know to look. The refusal-back comment in `bin/lib/jira.sh comment` is itself a Jira call, so if Jira is hard-down both will fail; in that case still print `FAILED: <KEY> jira unreachable` to stdout so the poller's log shows the right reason.
+- `0` (`OK` to stdout): worklog posted and ticket transitioned to "In Review".
+- non-zero (`PARTIAL: worklog=<rc> transition=<rc>` to stderr): one or both steps failed. **Refuse-back** with the helper's stderr as the reason — the PR is open and the dev stack is up, but Jira didn't get the update, so the human won't know to look. The refusal-back path in `bin/lib/jira.sh worklog` is itself a Jira call, so if Jira is hard-down both will fail; in that case still print `FAILED: <KEY> jira unreachable` to stdout so the poller's log shows the right reason.
 
 ### 4f. Final summary to stdout
 
@@ -170,7 +185,7 @@ One screen, machine-readable-ish:
 ```
 DONE: <TICKET_KEY>
 PR: <pr-url>
-Test URL: http://<LAN_HOST>:<NEXT_PORT>
+Test URL: https://<LAN_HOST>:<NEXT_PORT>
 Worktree: <WORKTREE_PATH>
 Jira: <OK | PARTIAL>
 ```
@@ -181,7 +196,7 @@ Then exit.
 
 If anything in Phase 3 or 4 errors out and you cannot recover via another implementer pass or refuse-back:
 
-1. Post Jira comment: `Automated work failed during <phase>. Last error: <one-line message>. Worktree at <WORKTREE_PATH> left intact for debugging. Latest commit on branch: <sha>.`
+1. Post Jira worklog entry (via `bin/lib/jira.sh worklog <TICKET_KEY>`): `Automated work failed during <phase>. Last error: <one-line message>. Worktree at <WORKTREE_PATH> left intact for debugging. Latest commit on branch: <sha>.`
 2. Do not transition the ticket.
 3. Leave the worktree and any background dev server intact.
 4. Print `FAILED: <ticket> <reason>` to stdout and exit.
