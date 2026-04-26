@@ -5,6 +5,7 @@
 #   fetch <KEY>                   → JSON to stdout: {summary, description,
 #                                                    status, assignee, labels, url}
 #   comment <KEY> [<body>]        Post a comment. Body from $2 or stdin.
+#   worklog <KEY> [<body>]        Post a worklog entry. Body from $2 or stdin.
 #   transition <KEY> <STATUS>     Transition the issue to a status by name.
 #   search <JQL>                  → newline-delimited list of issue keys.
 #   label-add <KEY> <LABEL>       Add a label to an issue.
@@ -29,6 +30,7 @@ usage() {
 Usage:
   jira.sh fetch <KEY>
   jira.sh comment <KEY> [<body>]
+  jira.sh worklog <KEY> [<body>]
   jira.sh transition <KEY> <STATUS>
   jira.sh search <JQL>
   jira.sh label-add <KEY> <LABEL>
@@ -72,6 +74,36 @@ Comment body (between the markers):
 $body
 ---/BODY---
 After posting, reply with the single word "OK".
+EOF
+    ;;
+  worklog)
+    [ $# -ge 1 ] || usage
+    key="$1"
+    if [ $# -ge 2 ]; then
+      body="$2"
+    else
+      body=$(cat)
+    fi
+    # Worklog comments are ADF on the wire, and there is no MCP shortcut
+    # tool that wraps strings in ADF for us (unlike issue comments). So
+    # the prompt spells out the endpoint and the ADF shape explicitly.
+    claude -p --allowed-tools "$ALLOWED_TOOLS" <<EOF
+Use the atlassian-jira MCP server to add a worklog entry to issue $key.
+
+Call jira_post with path "/rest/api/3/issue/$key/worklog" and a JSON body
+that has:
+  - "timeSpentSeconds": 60
+  - "comment": an ADF (Atlassian Document Format) document representing
+    the body text below. Wrap each non-blank line of the body as its own
+    paragraph node with a single text child. Blank lines in the body
+    separate paragraphs but should NOT produce empty paragraph nodes.
+
+Body text (between the markers):
+---BODY---
+$body
+---/BODY---
+
+After posting successfully, reply with the single word "OK".
 EOF
     ;;
   transition)
@@ -158,15 +190,15 @@ EOF
       "" \
       "When you are done testing, merge the PR — staging auto-deploys via the existing GitHub Actions workflow. Then run bin/finish-ticket $key on the dev host to clean up.")
 
-    comment_rc=0
+    worklog_rc=0
     transition_rc=0
-    printf '%s' "$body" | "$0" comment "$key" || comment_rc=$?
+    printf '%s' "$body" | "$0" worklog "$key" || worklog_rc=$?
     "$0" transition "$key" "In Review" || transition_rc=$?
 
-    if [ "$comment_rc" -eq 0 ] && [ "$transition_rc" -eq 0 ]; then
+    if [ "$worklog_rc" -eq 0 ] && [ "$transition_rc" -eq 0 ]; then
       echo "OK"
     else
-      echo "PARTIAL: comment=$comment_rc transition=$transition_rc" >&2
+      echo "PARTIAL: worklog=$worklog_rc transition=$transition_rc" >&2
       exit 1
     fi
     ;;
