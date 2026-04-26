@@ -33,10 +33,11 @@
     <key>EnvironmentVariables</key>
     <dict>
         <!-- launchd starts processes with a minimal PATH; ensure brew bins
-             (gh, jq, claude, docker) are reachable. Adjust if your prefix
-             is different (e.g. /opt/homebrew on Apple Silicon). -->
+             (gh, jq, docker) and ~/.local/bin (where the official `claude`
+             installer puts the CLI) are reachable. Adjust REPLACE_HOME and
+             the prefix if your install differs. -->
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>REPLACE_HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>REPLACE_HOME</string>
         <key>POLL_INTERVAL_SECONDS</key>
