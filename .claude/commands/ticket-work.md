@@ -32,6 +32,17 @@ Bind these to working variables in your head:
 
 Confirm out loud which ticket key you're working on. Then proceed.
 
+## Phase 0 — Claim the ticket
+
+Before doing any work, transition the ticket to "In Progress":
+
+```bash
+bin/lib/jira.sh transition $TICKET_KEY "In Progress" || \
+  echo "warning: In Progress transition failed (poller may have already done it)"
+```
+
+This is a no-op when the poller has already moved the ticket. It's only load-bearing for manual `/ticket-work` runs (no poller in the loop) — the deterministic poller-side transition covers the automated path.
+
 ## Phase 1 — Brainstorm (silently)
 
 Run `superpowers:brainstorming` against the ticket description, with the override above (no questions to human). The brainstorming skill normally asks clarifying questions; here, those become refusal-back triggers.
@@ -130,39 +141,19 @@ done
 
 If after 60s the dev server isn't responding, refuse-back with the dev server log tail as the reason.
 
-### 4e. Post the ready-to-test Jira comment
+### 4e. Hand off to Jira (comment + transition, in one call)
 
-Body (substitute the placeholders):
-
-```
-PR opened: <pr-url>
-
-Local test (LAN-accessible from any machine on this network):
-- Site: http://<LAN_HOST>:<NEXT_PORT>
-- MinIO console: http://<LAN_HOST>:<MINIO_CONSOLE_PORT> (minioadmin / minioadmin)
-- Dev server log: <WORKTREE_PATH>/.nextdev.log
-
-Worktree on the dev host: <WORKTREE_PATH>
-Branch: <BRANCH_NAME>
-
-When you're done testing, merge the PR — staging auto-deploys via the existing GitHub Actions workflow. Then run `bin/finish-ticket <TICKET_KEY>` on the dev host to clean up.
-```
-
-Post:
+The body and the transition are composed deterministically by the helper from the worktree's `.env.compose` and current git branch. Just run:
 
 ```bash
-printf '%s' "<body>" | bin/lib/jira.sh comment <TICKET_KEY>
+bin/lib/jira.sh ready-for-review $TICKET_KEY $PR_URL
 ```
 
-### 4f. Transition
+Exit status:
+- `0` (`OK` to stdout): comment posted and ticket transitioned to "In Review".
+- non-zero (`PARTIAL: comment=<rc> transition=<rc>` to stderr): one or both steps failed. **Refuse-back** with the helper's stderr as the reason — the PR is open and the dev stack is up, but Jira didn't get the update, so the human won't know to look. The refusal-back comment in `bin/lib/jira.sh comment` is itself a Jira call, so if Jira is hard-down both will fail; in that case still print `FAILED: <KEY> jira unreachable` to stdout so the poller's log shows the right reason.
 
-```bash
-bin/lib/jira.sh transition <TICKET_KEY> "In Review"
-```
-
-If "In Review" isn't valid for this ticket's current status, the wrapper will list valid transitions — pick the closest forward-progress one. If nothing reasonable is available, leave the ticket as-is and note that in the final summary (no refusal-back here — the work is done, only the transition is cosmetic).
-
-### 4g. Final summary to stdout
+### 4f. Final summary to stdout
 
 One screen, machine-readable-ish:
 
@@ -171,7 +162,7 @@ DONE: <TICKET_KEY>
 PR: <pr-url>
 Test URL: http://<LAN_HOST>:<NEXT_PORT>
 Worktree: <WORKTREE_PATH>
-Jira transition: <state>
+Jira: <OK | PARTIAL>
 ```
 
 Then exit.
