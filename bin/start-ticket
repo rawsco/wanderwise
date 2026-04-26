@@ -67,8 +67,9 @@ if [ -z "$DESCRIPTION" ] || [ "$DESCRIPTION" = "null" ]; then
   exit 1
 fi
 
-# --- Allocate ports ---
-PORTS_OUTPUT=$(allocate_workspace_ports)
+# --- Allocate ports (with persistent reservation so concurrent worktrees
+#     don't race for the same numbers between allocation and docker bind). ---
+PORTS_OUTPUT=$(allocate_workspace_ports "$TICKET")
 DDB_PORT=$(echo "$PORTS_OUTPUT" | grep ^DDB_PORT= | cut -d= -f2)
 MINIO_API_PORT=$(echo "$PORTS_OUTPUT" | grep ^MINIO_API_PORT= | cut -d= -f2)
 MINIO_CONSOLE_PORT=$(echo "$PORTS_OUTPUT" | grep ^MINIO_CONSOLE_PORT= | cut -d= -f2)
@@ -101,6 +102,7 @@ cleanup_partial() {
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
   fi
   git branch -D "$TICKET_LOWER" 2>/dev/null || true
+  release_workspace_ports "$TICKET" 2>/dev/null || true
 }
 trap cleanup_partial ERR
 

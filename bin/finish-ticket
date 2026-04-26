@@ -9,7 +9,12 @@ TICKET="$1"
 FORCE="${2:-}"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BIN_DIR="$ROOT_DIR/bin"
 cd "$ROOT_DIR"
+
+# Source ports.sh so we can release the worktree's port reservation at
+# the end (alongside the docker/worktree/branch teardown).
+. "$BIN_DIR/lib/ports.sh"
 
 TICKET_LOWER=$(echo "$TICKET" | tr '[:upper:]' '[:lower:]')
 WORKTREE_DIR="../wanderwise-$TICKET"
@@ -47,4 +52,8 @@ else
   git branch -d "$TICKET_LOWER" 2>/dev/null || true
 fi
 
-echo "Cleaned up $TICKET (worktree, docker stack, local branch)."
+# Release the persistent port reservation so the numbers are returned to
+# the pool. Idempotent — does nothing if the ticket has no reservation.
+release_workspace_ports "$TICKET"
+
+echo "Cleaned up $TICKET (worktree, docker stack, local branch, port reservation)."
