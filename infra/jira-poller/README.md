@@ -88,7 +88,7 @@ Edit the plist, then `launchctl unload && launchctl load`.
 
 - Per-ticket log: `~/.cache/wanderwise-poller/<TICKET>.log`
 - The worktree at `../wanderwise-<TICKET>` is left intact for debugging.
-- The Jira ticket should have a comment from Claude describing the failure.
+- The Jira ticket should have a worklog entry from Claude describing the failure.
 
 **Refused-back ticket keeps getting re-picked:**
 
