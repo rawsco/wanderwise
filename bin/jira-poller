@@ -76,14 +76,22 @@ spawn_ticket_work() {
 
   log "starting workspace for $key"
 
-  # Step 1: create the workspace.
+  # Step 1: transition the ticket to In Progress so the human can see at a
+  # glance that the poller has claimed it. Best-effort — if the transition
+  # fails (e.g. the workflow doesn't have an "In Progress" → status from
+  # "Ready For Claude"), log it and carry on.
+  if ! "$WANDERWISE_DIR/bin/lib/jira.sh" transition "$key" "In Progress" >> "$log_file" 2>&1; then
+    log "warning: could not transition $key to In Progress — see $log_file"
+  fi
+
+  # Step 2: create the workspace.
   if ! "$WANDERWISE_DIR/bin/start-ticket" "$key" >> "$log_file" 2>&1; then
     log "start-ticket failed for $key — see $log_file"
     remove_inflight "$key"
     return 1
   fi
 
-  # Step 2: spawn the autonomous session, detached, with cleanup-on-exit.
+  # Step 3: spawn the autonomous session, detached, with cleanup-on-exit.
   (
     cd "$worktree_dir"
     claude --dangerously-skip-permissions /ticket-work >> "$log_file" 2>&1
