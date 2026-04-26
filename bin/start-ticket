@@ -127,17 +127,28 @@ NEXT_PORT=$NEXT_PORT
 LAN_HOST=$LAN_HOST
 ENV
 
-# --- .env.local seeded with per-worktree ports ---
-if [ -f .env.local.example ]; then
+# --- .env.local: copy the operator's real secrets file verbatim, falling
+#     back to .env.local.example only if the operator hasn't filled one in.
+#     The example has placeholders for NEXTAUTH_SECRET and Cognito creds, so
+#     auth won't work in that case — we warn loudly. ---
+if [ -f .env.local ]; then
+  cp .env.local "$WORKTREE_DIR/.env.local"
+elif [ -f .env.local.example ]; then
   cp .env.local.example "$WORKTREE_DIR/.env.local"
-  # Substitute defaults to dynamic ports.
-  sed -i.bak \
-    -e "s|http://localhost:8000|http://localhost:$DDB_PORT|g" \
-    -e "s|http://localhost:9002|http://localhost:$MINIO_API_PORT|g" \
-    -e "s|http://localhost:3000|http://localhost:$NEXT_PORT|g" \
-    "$WORKTREE_DIR/.env.local"
-  rm -f "$WORKTREE_DIR/.env.local.bak"
+  echo "warning: .env.local missing — copied .env.local.example. Auth won't work" >&2
+  echo "         until you fill in NEXTAUTH_SECRET and the COGNITO_* vars." >&2
 fi
+
+# --- .env.development.local: per-worktree dynamic overrides only. Next.js
+#     loads both .env.local and .env.development.local; the latter wins for
+#     matching keys. We never mutate the operator's .env.local secrets. ---
+{
+  printf 'LAN_HOST=%s\n' "$LAN_HOST"
+  printf 'NEXTAUTH_URL=https://%s:%s\n' "$LAN_HOST" "$NEXT_PORT"
+  printf 'DYNAMODB_ENDPOINT=http://localhost:%s\n' "$DDB_PORT"
+  printf 'S3_ENDPOINT=http://localhost:%s\n' "$MINIO_API_PORT"
+  printf 'NEXT_PUBLIC_S3_PUBLIC_URL=http://localhost:%s/wanderwise\n' "$MINIO_API_PORT"
+} > "$WORKTREE_DIR/.env.development.local"
 
 # --- BRIEF.md ---
 # Build the file with `printf '%s'` per field so $SUMMARY/$DESCRIPTION/$URL
@@ -154,7 +165,7 @@ ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
   printf '**Compose project:** %s\n' "$PROJECT_NAME"
   printf '**LAN host:** %s\n\n' "$LAN_HOST"
   printf '**Ports allocated:**\n'
-  printf -- '- Next.js dev: %s (test URL: http://%s:%s)\n' "$NEXT_PORT" "$LAN_HOST" "$NEXT_PORT"
+  printf -- '- Next.js dev: %s (test URL: https://%s:%s — self-signed cert, click through warning)\n' "$NEXT_PORT" "$LAN_HOST" "$NEXT_PORT"
   printf -- '- DynamoDB: %s\n' "$DDB_PORT"
   printf -- '- MinIO API: %s\n' "$MINIO_API_PORT"
   printf -- '- MinIO Console: %s (test URL: http://%s:%s)\n\n' "$MINIO_CONSOLE_PORT" "$LAN_HOST" "$MINIO_CONSOLE_PORT"
@@ -164,7 +175,7 @@ ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
   printf '```bash\n'
   printf 'docker compose --env-file .env.compose -p %s \\\n' "$PROJECT_NAME"
   printf '  -f docker-compose.yml -f .docker/compose.override.yml up -d\n'
-  printf 'npm run dev -- -p %s\n' "$NEXT_PORT"
+  printf 'npm run dev -- --experimental-https -H 0.0.0.0 -p %s\n' "$NEXT_PORT"
   printf '```\n'
 } > "$WORKTREE_DIR/BRIEF.md"
 
@@ -179,7 +190,7 @@ Workspace ready for $TICKET ($SUMMARY)
   Compose project: $PROJECT_NAME
   LAN host:        $LAN_HOST
 
-  Next.js dev:     http://$LAN_HOST:$NEXT_PORT
+  Next.js dev:     https://$LAN_HOST:$NEXT_PORT  (self-signed cert)
   DynamoDB:        http://$LAN_HOST:$DDB_PORT
   MinIO API:       http://$LAN_HOST:$MINIO_API_PORT
   MinIO Console:   http://$LAN_HOST:$MINIO_CONSOLE_PORT
