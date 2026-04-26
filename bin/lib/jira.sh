@@ -29,6 +29,7 @@ usage() {
 Usage:
   jira.sh fetch <KEY>
   jira.sh comment <KEY> [<body>]
+  jira.sh worklog <KEY> [<body>]
   jira.sh transition <KEY> <STATUS>
   jira.sh search <JQL>
   jira.sh label-add <KEY> <LABEL>
@@ -72,6 +73,49 @@ Comment body (between the markers):
 $body
 ---/BODY---
 After posting, reply with the single word "OK".
+EOF
+    ;;
+  worklog)
+    [ $# -ge 1 ] || usage
+    key="$1"
+    if [ $# -ge 2 ]; then
+      body="$2"
+    else
+      body=$(cat)
+    fi
+
+    # Convert the plain-text body into Atlassian Document Format. The
+    # worklog endpoint requires `comment` to be ADF JSON, not plain text
+    # like the comment endpoint accepts. Each line becomes a paragraph;
+    # blank lines become empty paragraphs.
+    adf_doc=$(printf '%s' "$body" | jq -Rs '
+      split("\n")
+      | (if .[-1] == "" then .[:-1] else . end)
+      | map(
+          if . == "" then {type:"paragraph"}
+          else {type:"paragraph", content:[{type:"text", text:.}]}
+          end
+        )
+      | {type:"doc", version:1, content:.}
+    ')
+
+    # Worklog API requires `started` (ISO 8601 with timezone) and
+    # `timeSpentSeconds`. We log a nominal 60s — these entries are
+    # status notes from automation, not real time tracking.
+    started=$(date -u +"%Y-%m-%dT%H:%M:%S.000+0000")
+
+    request_body=$(jq -n --arg started "$started" --argjson comment "$adf_doc" \
+      '{started:$started, timeSpentSeconds:60, comment:$comment}')
+
+    claude -p --allowed-tools "$ALLOWED_TOOLS" <<EOF
+Use the atlassian-jira MCP server to add a worklog entry to issue $key.
+
+Call jira_post with path "/rest/api/3/issue/$key/worklog" and this exact JSON body:
+---BODY---
+$request_body
+---/BODY---
+
+After posting successfully, reply with the single word "OK".
 EOF
     ;;
   transition)
@@ -158,15 +202,15 @@ EOF
       "" \
       "When you are done testing, merge the PR — staging auto-deploys via the existing GitHub Actions workflow. Then run bin/finish-ticket $key on the dev host to clean up.")
 
-    comment_rc=0
+    worklog_rc=0
     transition_rc=0
-    printf '%s' "$body" | "$0" comment "$key" || comment_rc=$?
+    printf '%s' "$body" | "$0" worklog "$key" || worklog_rc=$?
     "$0" transition "$key" "In Review" || transition_rc=$?
 
-    if [ "$comment_rc" -eq 0 ] && [ "$transition_rc" -eq 0 ]; then
+    if [ "$worklog_rc" -eq 0 ] && [ "$transition_rc" -eq 0 ]; then
       echo "OK"
     else
-      echo "PARTIAL: comment=$comment_rc transition=$transition_rc" >&2
+      echo "PARTIAL: worklog=$worklog_rc transition=$transition_rc" >&2
       exit 1
     fi
     ;;
