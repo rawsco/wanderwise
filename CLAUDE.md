@@ -21,7 +21,7 @@ npm run build
 
 Copy `.env.local.example` to `.env.local` before running locally and fill in `NEXTAUTH_SECRET` (any `openssl rand -base64 32`) and the `COGNITO_*` values from `sst dev` / AWS Console output.
 
-**For ticket-work worktrees** (LAN-accessible test envs spun up by `bin/start-ticket`): once, set `WANDERWISE_LAN_DEV_HOST=<your-LAN-ip>` and run `sst deploy --stage dev` so worktree ports `3100..3119` are pre-registered as Cognito OAuth callback URLs. Without this, login in the worktree test env fails with `redirect_mismatch`. See `sst.config.ts`.
+**For ticket-work worktrees** (LAN-accessible test envs spun up by `bin/start-ticket`): once, set `WANDERWISE_LAN_DEV_HOST=<your-LAN-ip>` and run `sst deploy --stage dev` so worktree ports `3100..3119` are pre-registered as Cognito OAuth callback URLs. The dev server runs over **HTTPS with a self-signed cert** (`next dev --experimental-https`) because Cognito refuses non-`https` callbacks for any host except `localhost`. First time you hit `https://<lan>:<port>` on a new browser/device, click "Advanced → Proceed" past the cert warning; subsequent hits are silent. Without all this, login in the worktree test env fails with either `redirect_mismatch` or "cannot use the HTTP protocol". See `sst.config.ts`.
 
 ## Architecture
 

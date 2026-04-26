@@ -149,7 +149,7 @@ EOF
       "PR opened: $pr_url" \
       "" \
       "Local test (LAN-accessible from any machine on this network):" \
-      "- Site: http://$LAN_HOST:$NEXT_PORT" \
+      "- Site: https://$LAN_HOST:$NEXT_PORT  (self-signed cert: first hit on each device shows a browser warning, click Advanced -> Proceed)" \
       "- MinIO console: http://$LAN_HOST:$MINIO_CONSOLE_PORT (minioadmin / minioadmin)" \
       "- Dev server log: $worktree_path/.nextdev.log" \
       "" \

@@ -144,7 +144,7 @@ fi
 #     matching keys. We never mutate the operator's .env.local secrets. ---
 {
   printf 'LAN_HOST=%s\n' "$LAN_HOST"
-  printf 'NEXTAUTH_URL=http://%s:%s\n' "$LAN_HOST" "$NEXT_PORT"
+  printf 'NEXTAUTH_URL=https://%s:%s\n' "$LAN_HOST" "$NEXT_PORT"
   printf 'DYNAMODB_ENDPOINT=http://localhost:%s\n' "$DDB_PORT"
   printf 'S3_ENDPOINT=http://localhost:%s\n' "$MINIO_API_PORT"
   printf 'NEXT_PUBLIC_S3_PUBLIC_URL=http://localhost:%s/wanderwise\n' "$MINIO_API_PORT"
@@ -165,7 +165,7 @@ ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
   printf '**Compose project:** %s\n' "$PROJECT_NAME"
   printf '**LAN host:** %s\n\n' "$LAN_HOST"
   printf '**Ports allocated:**\n'
-  printf -- '- Next.js dev: %s (test URL: http://%s:%s)\n' "$NEXT_PORT" "$LAN_HOST" "$NEXT_PORT"
+  printf -- '- Next.js dev: %s (test URL: https://%s:%s — self-signed cert, click through warning)\n' "$NEXT_PORT" "$LAN_HOST" "$NEXT_PORT"
   printf -- '- DynamoDB: %s\n' "$DDB_PORT"
   printf -- '- MinIO API: %s\n' "$MINIO_API_PORT"
   printf -- '- MinIO Console: %s (test URL: http://%s:%s)\n\n' "$MINIO_CONSOLE_PORT" "$LAN_HOST" "$MINIO_CONSOLE_PORT"
@@ -175,7 +175,7 @@ ABS_WORKTREE=$(cd "$WORKTREE_DIR" && pwd)
   printf '```bash\n'
   printf 'docker compose --env-file .env.compose -p %s \\\n' "$PROJECT_NAME"
   printf '  -f docker-compose.yml -f .docker/compose.override.yml up -d\n'
-  printf 'npm run dev -- -p %s\n' "$NEXT_PORT"
+  printf 'npm run dev -- --experimental-https -H 0.0.0.0 -p %s\n' "$NEXT_PORT"
   printf '```\n'
 } > "$WORKTREE_DIR/BRIEF.md"
 
@@ -190,7 +190,7 @@ Workspace ready for $TICKET ($SUMMARY)
   Compose project: $PROJECT_NAME
   LAN host:        $LAN_HOST
 
-  Next.js dev:     http://$LAN_HOST:$NEXT_PORT
+  Next.js dev:     https://$LAN_HOST:$NEXT_PORT  (self-signed cert)
   DynamoDB:        http://$LAN_HOST:$DDB_PORT
   MinIO API:       http://$LAN_HOST:$MINIO_API_PORT
   MinIO Console:   http://$LAN_HOST:$MINIO_CONSOLE_PORT
