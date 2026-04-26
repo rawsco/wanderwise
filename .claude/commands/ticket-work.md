@@ -127,11 +127,11 @@ nohup npm run dev -- -H 0.0.0.0 -p <NEXT_PORT> > .nextdev.log 2>&1 &
 disown
 ```
 
-Wait for it to come up — poll the LAN URL until 200 OK or 60s elapses:
+Wait for it to come up — poll an auth-sensitive endpoint until 200 OK or 60s elapses. We probe `/api/auth/csrf` rather than `/` because `/` returns 200 even when `NEXTAUTH_SECRET` is missing or `COGNITO_*` is misconfigured, so a green `/` masks a broken test env. `/api/auth/csrf` only returns 200 when NextAuth has a secret to mint a CSRF token with:
 
 ```bash
 for i in $(seq 1 30); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://<LAN_HOST>:<NEXT_PORT>/" || true)
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://<LAN_HOST>:<NEXT_PORT>/api/auth/csrf" || true)
   case "$code" in
     2*|3*) break ;;
   esac
@@ -139,7 +139,7 @@ for i in $(seq 1 30); do
 done
 ```
 
-If after 60s the dev server isn't responding, refuse-back with the dev server log tail as the reason.
+If after 60s `/api/auth/csrf` isn't returning 2xx, refuse-back with the dev server log tail as the reason — auth will be broken in the test env, so calling it "ready to test" would be a lie. Common causes: `.env.local` not present in the worktree (operator hasn't filled it in); `NEXTAUTH_SECRET` missing; the per-worktree LAN callback URL isn't registered in the dev-stage Cognito User Pool (run `sst deploy --stage dev` once after `fix/test-env-build` lands).
 
 ### 4e. Hand off to Jira (comment + transition, in one call)
 

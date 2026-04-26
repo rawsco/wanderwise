@@ -127,17 +127,28 @@ NEXT_PORT=$NEXT_PORT
 LAN_HOST=$LAN_HOST
 ENV
 
-# --- .env.local seeded with per-worktree ports ---
-if [ -f .env.local.example ]; then
+# --- .env.local: copy the operator's real secrets file verbatim, falling
+#     back to .env.local.example only if the operator hasn't filled one in.
+#     The example has placeholders for NEXTAUTH_SECRET and Cognito creds, so
+#     auth won't work in that case — we warn loudly. ---
+if [ -f .env.local ]; then
+  cp .env.local "$WORKTREE_DIR/.env.local"
+elif [ -f .env.local.example ]; then
   cp .env.local.example "$WORKTREE_DIR/.env.local"
-  # Substitute defaults to dynamic ports.
-  sed -i.bak \
-    -e "s|http://localhost:8000|http://localhost:$DDB_PORT|g" \
-    -e "s|http://localhost:9002|http://localhost:$MINIO_API_PORT|g" \
-    -e "s|http://localhost:3000|http://localhost:$NEXT_PORT|g" \
-    "$WORKTREE_DIR/.env.local"
-  rm -f "$WORKTREE_DIR/.env.local.bak"
+  echo "warning: .env.local missing — copied .env.local.example. Auth won't work" >&2
+  echo "         until you fill in NEXTAUTH_SECRET and the COGNITO_* vars." >&2
 fi
+
+# --- .env.development.local: per-worktree dynamic overrides only. Next.js
+#     loads both .env.local and .env.development.local; the latter wins for
+#     matching keys. We never mutate the operator's .env.local secrets. ---
+{
+  printf 'LAN_HOST=%s\n' "$LAN_HOST"
+  printf 'NEXTAUTH_URL=http://%s:%s\n' "$LAN_HOST" "$NEXT_PORT"
+  printf 'DYNAMODB_ENDPOINT=http://localhost:%s\n' "$DDB_PORT"
+  printf 'S3_ENDPOINT=http://localhost:%s\n' "$MINIO_API_PORT"
+  printf 'NEXT_PUBLIC_S3_PUBLIC_URL=http://localhost:%s/wanderwise\n' "$MINIO_API_PORT"
+} > "$WORKTREE_DIR/.env.development.local"
 
 # --- BRIEF.md ---
 # Build the file with `printf '%s'` per field so $SUMMARY/$DESCRIPTION/$URL
