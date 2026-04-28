@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, Map, ListChecks, BookOpen, Phone, Globe, Loader2, Trash2, Send, Sparkles } from "lucide-react";
+import { Calendar, Clock, Map, ListChecks, BookOpen, Phone, Globe, Loader2, Trash2, Send, Sparkles, Pencil, Check, X } from "lucide-react";
 import { BookingConfirmButton } from "@/components/stop/BookingConfirmButton";
 import { bookingHash } from "@/lib/booking-hash";
 import type { StopNote } from "@/types/stop";
@@ -55,6 +55,10 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [bookingStatus, setBookingStatus] = useState<"enquiry" | "pending" | "confirmed" | undefined>(stop.bookingStatus);
   const [summary, setSummary] = useState<string | undefined>(initialSummary);
   const [summaryAt, setSummaryAt] = useState<string | undefined>(initialSummaryGeneratedAt);
@@ -154,6 +158,42 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
     });
     setNotes(prev => prev.filter(n => n.noteId !== noteId));
     setDeleting(null);
+  }
+
+  function startEdit(note: StopNote) {
+    setEditingId(note.noteId);
+    setEditText(note.text);
+    setEditError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+    setEditError(null);
+  }
+
+  async function saveEdit(noteId: string) {
+    const text = editText.trim();
+    if (!text) {
+      setEditError("Note cannot be empty");
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    const res = await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}/notes`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteId, text }),
+    });
+    if (res.ok) {
+      const updated: StopNote = await res.json();
+      setNotes(prev => prev.map(n => (n.noteId === noteId ? updated : n)));
+      setEditingId(null);
+      setEditText("");
+    } else {
+      setEditError("Could not save changes");
+    }
+    setEditSaving(false);
   }
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -287,20 +327,75 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
                 <div className="space-y-3">
                   {[...notes].reverse().map(note => (
                     <div key={note.noteId} className="group relative rounded-lg bg-gray-50 border border-gray-100 px-3 py-2.5">
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.text}</p>
-                      <div className="flex items-center justify-between mt-1.5">
-                        <p className="text-[11px] text-gray-400" suppressHydrationWarning>{formatNoteDate(note.createdAt)}</p>
-                        <button
-                          onClick={() => deleteNote(note.noteId)}
-                          disabled={deleting === note.noteId}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400 p-1"
-                        >
-                          {deleting === note.noteId
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : <Trash2 className="h-3.5 w-3.5" />
-                          }
-                        </button>
-                      </div>
+                      {editingId === note.noteId ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editText}
+                            onChange={e => setEditText(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveEdit(note.noteId);
+                              if (e.key === "Escape") cancelEdit();
+                            }}
+                            rows={3}
+                            autoFocus
+                            className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-base text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                          />
+                          {editError && (
+                            <p className="text-xs text-red-600" role="alert">{editError}</p>
+                          )}
+                          <div className="flex gap-1.5">
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs px-2.5"
+                              onClick={() => saveEdit(note.noteId)}
+                              disabled={editSaving}
+                            >
+                              {editSaving
+                                ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                : <Check className="h-3 w-3 mr-1" />
+                              }
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs px-2.5"
+                              onClick={cancelEdit}
+                              disabled={editSaving}
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{note.text}</p>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <p className="text-[11px] text-gray-400" suppressHydrationWarning>{formatNoteDate(note.createdAt)}</p>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => startEdit(note)}
+                                className="text-gray-300 hover:text-emerald-500 p-1"
+                                aria-label="Edit note"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => deleteNote(note.noteId)}
+                                disabled={deleting === note.noteId}
+                                className="text-gray-300 hover:text-red-400 p-1"
+                                aria-label="Delete note"
+                              >
+                                {deleting === note.noteId
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <Trash2 className="h-3.5 w-3.5" />
+                                }
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
