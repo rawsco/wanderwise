@@ -6,7 +6,7 @@
 // Bumping `PROMPT_VERSION` invalidates every cached summary the next
 // time the user opens the Summary tab.
 
-export const PROMPT_VERSION = "v4";
+export const PROMPT_VERSION = "v5";
 
 export interface BookingHashFields {
   name: string;

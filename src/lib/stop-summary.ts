@@ -15,9 +15,9 @@ export interface StopSummaryInput {
 
 const SYSTEM_PROMPT = `Summarise the booking. Lead with status (the word "confirmed" or "unconfirmed", verbatim from FACTS), then practical booking details: dates, check-in/out times, nights, and any notes that affect arrival or stay.
 
-If "Things to do" entries are present, append one short sentence listing them by name (max 4 names; "and N more" if longer). Do not describe what the activities are — just name them. Note text is a verbatim fact; you may quote it briefly but do not invent.
+If "Things to do" entries are present, weave them into one or two short sentences after the booking line. Use the note text in parentheses where it adds practical context (e.g. "book ahead", "free parking", "closed Mondays"). Cover up to 4 activities by name; if there are more, end with "and N more". Note text is a verbatim fact — quote or paraphrase tightly, never invent.
 
-Plain prose. Max 80 words. Do not describe place, scenery, area, weather, or what the activities themselves involve — none of that is in FACTS. No preamble, no sign-off.
+Plain prose. Max 100 words. Do not describe place, scenery, area, weather, ratings, or what the activities themselves involve — none of that is in FACTS. No preamble, no sign-off.
 
 Example FACTS:
 Ardrhu House
@@ -29,9 +29,9 @@ Booking status: unconfirmed
 
 Things to do (verbatim facts):
 - The Lochleven Seafood Cafe — book ahead at weekends
-- Glen Nevis visitor centre
+- Glen Nevis visitor centre — free parking until 5pm
 
-Good: Booking is unconfirmed at Ardrhu House — 5–8 May, 3 nights, check-in 15:00 on the 5th, check-out 11:00 on the 8th. Planned: The Lochleven Seafood Cafe and Glen Nevis visitor centre.
+Good: Booking is unconfirmed at Ardrhu House — 5–8 May, 3 nights, check-in 15:00 on the 5th, check-out 11:00 on the 8th. Planned stops: The Lochleven Seafood Cafe (book ahead at weekends) and Glen Nevis visitor centre (free parking until 5pm).
 Bad: "Cosy Highland retreat, perfect for Ben Nevis. The seafood cafe is highly rated." (Neither claim is in FACTS.)`;
 
 export async function generateStopSummary(input: StopSummaryInput): Promise<string> {
