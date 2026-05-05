@@ -48,6 +48,17 @@ All three must pass. There is no test suite yet.
 - Server components are the default in App Router. Only add `"use client"` when genuinely needed (interactivity, browser APIs, hooks).
 - Use `SessionProvider` (already in `src/app/providers.tsx`) for client-side session access; don't wrap it again.
 
+## Pull requests
+
+**Never leave a stacked PR pointed at a feature branch once that feature lands on `main`.** Staging deploys from `main`, so a PR whose base is a dead/merged feature branch will merge into that branch — not `main` — and silently miss every deploy. We hit this on PR #30 (summary work merged into `feat/things-to-do` after #29 had already landed; staging never saw the change).
+
+Pick one when a change depends on un-merged work:
+
+- **Preferred:** open the dependent PR against `main` from day one. Note the dependency in the body. Merge the parent first; rebase/merge the dependent.
+- **If you must stack:** retarget with `gh pr edit <N> --base main` *immediately* after the parent PR merges, before merging the dependent. The base branch deletion that GitHub may or may not perform on parent merge is not reliable as a safety net.
+
+Before merging any PR, sanity-check `gh pr view <N> --json baseRefName` is `main` (or whatever the long-lived target should be).
+
 ## What not to do
 
 - Don't run `npm install` without confirming with the user first.
