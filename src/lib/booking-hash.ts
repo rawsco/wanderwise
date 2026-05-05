@@ -6,7 +6,7 @@
 // Bumping `PROMPT_VERSION` invalidates every cached summary the next
 // time the user opens the Summary tab.
 
-export const PROMPT_VERSION = "v3";
+export const PROMPT_VERSION = "v5";
 
 export interface BookingHashFields {
   name: string;
@@ -17,6 +17,7 @@ export interface BookingHashFields {
   checkOutTime?: string;
   bookingStatus?: "enquiry" | "pending" | "confirmed";
   notes?: { text: string }[];
+  activities?: { name: string; note?: string }[];
 }
 
 export async function bookingHash(input: BookingHashFields): Promise<string> {
@@ -30,6 +31,7 @@ export async function bookingHash(input: BookingHashFields): Promise<string> {
     input.checkOutTime ?? null,
     input.bookingStatus === "confirmed" ? "confirmed" : "unconfirmed",
     [...(input.notes ?? [])].map(n => n.text).sort(),
+    [...(input.activities ?? [])].map(a => `${a.name}::${a.note ?? ""}`).sort(),
   ]);
   const buf = new TextEncoder().encode(sig);
   const hash = await crypto.subtle.digest("SHA-256", buf);
