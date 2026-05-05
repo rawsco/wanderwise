@@ -20,6 +20,7 @@ export const StopEntity = new Entity(
       bookingStatus: { type: "string" },
       placeId: { type: "string" },
       notes: { type: "any" },
+      activities: { type: "any" },
       summary: { type: "string" },
       summaryGeneratedAt: { type: "string" },
       summaryHash: { type: "string" },

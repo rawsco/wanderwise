@@ -14,5 +14,11 @@ const client = new DynamoDBClient({
   }),
 });
 
-export const docClient = DynamoDBDocumentClient.from(client);
+// `removeUndefinedValues: true` strips `undefined` from items at marshal time,
+// so optional fields on cached objects (e.g. SearchCacheEntity.results: { rating?, summary? })
+// don't blow up DynamoDB writes. Without it the SDK throws
+// "Pass options.removeUndefinedValues=true to remove undefined values…".
+export const docClient = DynamoDBDocumentClient.from(client, {
+  marshallOptions: { removeUndefinedValues: true },
+});
 export const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME ?? "wanderwise";

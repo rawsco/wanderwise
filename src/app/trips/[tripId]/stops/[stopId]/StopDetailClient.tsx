@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { APIProvider } from "@vis.gl/react-google-maps";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, Map, ListChecks, BookOpen, Phone, Globe, Loader2, Trash2, Send, Sparkles, Pencil, Check, X } from "lucide-react";
 import { BookingConfirmButton } from "@/components/stop/BookingConfirmButton";
+import { ActivitySearch, type SearchResult } from "@/components/stop/ActivitySearch";
+import { ActivityList } from "@/components/stop/ActivityList";
+import { StopMap } from "@/components/stop/StopMap";
 import { bookingHash } from "@/lib/booking-hash";
-import type { StopNote } from "@/types/stop";
+import type { StopNote, Activity } from "@/types/stop";
 import type { PlaceContact } from "@/lib/places";
 
 interface Stop {
@@ -14,6 +18,8 @@ interface Stop {
   tripId: string;
   name: string;
   address: string;
+  lat: number;
+  lng: number;
   arrivalDate?: string;
   departureDate?: string;
   checkInTime?: string;
@@ -24,6 +30,7 @@ interface Stop {
 interface Props {
   stop: Stop;
   initialNotes: StopNote[];
+  initialActivities: Activity[];
   contact: PlaceContact;
   initialSummary?: string;
   initialSummaryGeneratedAt?: string;
@@ -49,9 +56,11 @@ function nightsBetween(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function StopDetailClient({ stop, initialNotes, contact, initialSummary, initialSummaryGeneratedAt, initialSummaryHash }: Props) {
+export function StopDetailClient({ stop, initialNotes, initialActivities, contact, initialSummary, initialSummaryGeneratedAt, initialSummaryHash }: Props) {
   const [tab, setTab] = useState<Tab>("booking");
   const [notes, setNotes] = useState<StopNote[]>(initialNotes);
+  const [activities, setActivities] = useState<Activity[]>(initialActivities);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -196,6 +205,45 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
     setEditSaving(false);
   }
 
+  async function addFromSearch(result: SearchResult) {
+    const res = await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}/activities`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: result.name,
+        address: result.address,
+        lat: result.lat,
+        lng: result.lng,
+        placeId: result.placeId,
+      }),
+    });
+    if (!res.ok) return;
+    const activity: Activity = await res.json();
+    setActivities(prev => [...prev, activity]);
+    setSearchResults(prev => prev.filter(r => r.placeId !== result.placeId));
+  }
+
+  async function updateActivityNote(activityId: string, note: string): Promise<boolean> {
+    const res = await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}/activities`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activityId, note: note || undefined }),
+    });
+    if (!res.ok) return false;
+    const updated: Activity = await res.json();
+    setActivities(prev => prev.map(a => (a.activityId === activityId ? updated : a)));
+    return true;
+  }
+
+  async function deleteActivity(activityId: string) {
+    await fetch(`/api/trips/${stop.tripId}/stops/${stop.stopId}/activities`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activityId }),
+    });
+    setActivities(prev => prev.filter(a => a.activityId !== activityId));
+  }
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "booking", label: "Booking", icon: <BookOpen className="h-4 w-4" /> },
     { id: "summary", label: "Summary", icon: <Sparkles className="h-4 w-4" /> },
@@ -204,6 +252,7 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
   ];
 
   return (
+    <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!} libraries={["places"]}>
     <div className="space-y-4">
       {/* Tab bar */}
       <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
@@ -467,13 +516,43 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
 
       {/* Things to do tab */}
       {tab === "todo" && (
-        <Card>
-          <CardContent className="py-12 text-center text-gray-400">
-            <Map className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-medium">No activities planned yet</p>
-            <p className="text-xs mt-1">AI-powered suggestions coming soon.</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          {(activities.length > 0 || searchResults.length > 0) && (
+            <Card>
+              <CardContent className="p-0 overflow-hidden rounded-xl">
+                <StopMap
+                  stop={stop}
+                  activities={activities}
+                  searchResults={searchResults}
+                  onAddSearchResult={addFromSearch}
+                />
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Map className="h-4 w-4 text-gray-400" />
+                Things to do
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ActivitySearch
+                tripId={stop.tripId}
+                stopId={stop.stopId}
+                results={searchResults}
+                onResults={setSearchResults}
+                onClear={() => setSearchResults([])}
+                onAddSearchResult={addFromSearch}
+              />
+              <ActivityList
+                activities={activities}
+                onUpdate={updateActivityNote}
+                onDelete={deleteActivity}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Checklist tab */}
@@ -487,5 +566,6 @@ export function StopDetailClient({ stop, initialNotes, contact, initialSummary, 
         </Card>
       )}
     </div>
+    </APIProvider>
   );
 }

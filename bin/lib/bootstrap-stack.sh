@@ -46,38 +46,75 @@ wait_for_url "$S3_ENDPOINT_URL" "MinIO"
 
 log "creating DynamoDB table '$TABLE_NAME' (idempotent)"
 DYNAMODB_ENDPOINT="$DDB_ENDPOINT" DYNAMODB_TABLE_NAME="$TABLE_NAME" node -e "
-const { DynamoDBClient, CreateTableCommand } = require('@aws-sdk/client-dynamodb');
+const {
+  DynamoDBClient,
+  CreateTableCommand,
+  UpdateTimeToLiveCommand,
+  DescribeTimeToLiveCommand,
+} = require('@aws-sdk/client-dynamodb');
 const client = new DynamoDBClient({
   region: 'eu-west-1',
   endpoint: process.env.DYNAMODB_ENDPOINT,
   credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
 });
-client.send(new CreateTableCommand({
-  TableName: process.env.DYNAMODB_TABLE_NAME,
-  AttributeDefinitions: [
-    { AttributeName: 'pk', AttributeType: 'S' },
-    { AttributeName: 'sk', AttributeType: 'S' },
-    { AttributeName: 'gsi1pk', AttributeType: 'S' },
-    { AttributeName: 'gsi1sk', AttributeType: 'S' },
-  ],
-  KeySchema: [
-    { AttributeName: 'pk', KeyType: 'HASH' },
-    { AttributeName: 'sk', KeyType: 'RANGE' },
-  ],
-  GlobalSecondaryIndexes: [{
-    IndexName: 'GSI1',
-    KeySchema: [
-      { AttributeName: 'gsi1pk', KeyType: 'HASH' },
-      { AttributeName: 'gsi1sk', KeyType: 'RANGE' },
-    ],
-    Projection: { ProjectionType: 'ALL' },
-  }],
-  BillingMode: 'PAY_PER_REQUEST',
-})).then(() => console.log('table created'))
-  .catch(e => {
+
+async function ensureTtl() {
+  const desc = await client.send(new DescribeTimeToLiveCommand({
+    TableName: process.env.DYNAMODB_TABLE_NAME,
+  }));
+  const status = desc.TimeToLiveDescription?.TimeToLiveStatus;
+  if (status === 'ENABLED' || status === 'ENABLING') {
+    console.log('TTL already enabled');
+    return;
+  }
+  await client.send(new UpdateTimeToLiveCommand({
+    TableName: process.env.DYNAMODB_TABLE_NAME,
+    TimeToLiveSpecification: { Enabled: true, AttributeName: 'ttl' },
+  }));
+  console.log('TTL enabled on attribute \"ttl\"');
+}
+
+async function main() {
+  try {
+    await client.send(new CreateTableCommand({
+      TableName: process.env.DYNAMODB_TABLE_NAME,
+      AttributeDefinitions: [
+        { AttributeName: 'pk', AttributeType: 'S' },
+        { AttributeName: 'sk', AttributeType: 'S' },
+        { AttributeName: 'gsi1pk', AttributeType: 'S' },
+        { AttributeName: 'gsi1sk', AttributeType: 'S' },
+      ],
+      KeySchema: [
+        { AttributeName: 'pk', KeyType: 'HASH' },
+        { AttributeName: 'sk', KeyType: 'RANGE' },
+      ],
+      GlobalSecondaryIndexes: [{
+        IndexName: 'GSI1',
+        KeySchema: [
+          { AttributeName: 'gsi1pk', KeyType: 'HASH' },
+          { AttributeName: 'gsi1sk', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      }],
+      BillingMode: 'PAY_PER_REQUEST',
+    }));
+    console.log('table created');
+  } catch (e) {
     if (e.name === 'ResourceInUseException') console.log('table already exists');
     else { console.error('table create failed:', e.message); process.exit(1); }
-  });
+  }
+
+  // DynamoDB Local supports the TTL API (no-op enforcement, but the call
+  // succeeds). Cloud stages set TTL via SST. Skip silently if the local
+  // build doesn't implement it.
+  try {
+    await ensureTtl();
+  } catch (e) {
+    console.log('TTL setup skipped:', e.message);
+  }
+}
+
+main();
 "
 
 log "creating MinIO bucket '$BUCKET' (idempotent)"
