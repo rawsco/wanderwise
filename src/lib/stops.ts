@@ -1,7 +1,7 @@
 import { StopEntity } from "./db/stop.entity";
 import { generateStopSummary } from "./stop-summary";
 import { bookingHash, type BookingHashFields } from "./booking-hash";
-import type { StopNote } from "@/types/stop";
+import type { StopNote, Activity } from "@/types/stop";
 
 export type StopKind = "start" | "intermediate" | "end";
 
@@ -55,7 +55,8 @@ function hasBookingContent(input: BookingHashFields): boolean {
   return Boolean(
     input.arrivalDate ||
     input.departureDate ||
-    (input.notes && input.notes.length > 0)
+    (input.notes && input.notes.length > 0) ||
+    (input.activities && input.activities.length > 0)
   );
 }
 
@@ -86,6 +87,9 @@ export async function ensureFreshSummary(
   const notesArr = stop.notes as StopNote[] | undefined;
   const notes = notesArr?.map(n => ({ text: n.text, createdAt: n.createdAt }));
 
+  const activitiesArr = stop.activities as Activity[] | undefined;
+  const activities = activitiesArr?.map(a => ({ name: a.name, note: a.note }));
+
   const fields: BookingHashFields = {
     name: stop.name,
     address: stop.address,
@@ -95,6 +99,7 @@ export async function ensureFreshSummary(
     checkOutTime: stop.checkOutTime,
     bookingStatus: stop.bookingStatus as "enquiry" | "pending" | "confirmed" | undefined,
     notes,
+    activities,
   };
 
   const hash = await bookingHash(fields);
@@ -120,7 +125,7 @@ export async function ensureFreshSummary(
     : undefined;
 
   try {
-    const summary = await generateStopSummary({ ...fields, nights, notes });
+    const summary = await generateStopSummary({ ...fields, nights, notes, activities });
     const generatedAt = new Date().toISOString();
     await StopEntity.update({ tripId, stopId })
       .set({ summary, summaryHash: hash, summaryGeneratedAt: generatedAt })

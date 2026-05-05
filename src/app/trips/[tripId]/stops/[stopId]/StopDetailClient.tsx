@@ -37,7 +37,7 @@ interface Props {
   initialSummaryHash?: string;
 }
 
-type Tab = "booking" | "summary" | "todo" | "checklist";
+type Tab = "booking" | "todo" | "checklist";
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -75,13 +75,13 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
   const [summaryRegenerating, setSummaryRegenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Lazy-fetch the summary when the tab is opened. We pre-compute the
-  // expected hash from the same booking inputs the server uses; if it
-  // differs from the stored hash we know the server is going to
+  // Lazy-fetch the summary when the booking tab is open. We pre-compute
+  // the expected hash from the same booking inputs the server uses; if
+  // it differs from the stored hash we know the server is going to
   // regenerate and we clear the visible summary up-front so no stale
   // text is shown while the new one is being produced.
   useEffect(() => {
-    if (tab !== "summary") return;
+    if (tab !== "booking") return;
     let cancelled = false;
 
     (async () => {
@@ -94,6 +94,7 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
         checkOutTime: stop.checkOutTime,
         bookingStatus,
         notes: notes.map(n => ({ text: n.text })),
+        activities: activities.map(a => ({ name: a.name, note: a.note })),
       });
       if (cancelled) return;
 
@@ -135,7 +136,7 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
     })();
 
     return () => { cancelled = true; };
-  }, [tab, stop, bookingStatus, notes, summaryHash]);
+  }, [tab, stop, bookingStatus, notes, activities, summaryHash]);
 
   const nights = stop.arrivalDate && stop.departureDate
     ? nightsBetween(stop.arrivalDate, stop.departureDate)
@@ -246,7 +247,6 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "booking", label: "Booking", icon: <BookOpen className="h-4 w-4" /> },
-    { id: "summary", label: "Summary", icon: <Sparkles className="h-4 w-4" /> },
     { id: "todo", label: "Things to do", icon: <Map className="h-4 w-4" /> },
     { id: "checklist", label: "Checklist", icon: <ListChecks className="h-4 w-4" /> },
   ];
@@ -275,6 +275,39 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
       {/* Booking tab */}
       {tab === "booking" && (
         <div className="space-y-4">
+
+          {/* AI summary */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-gray-400" />
+                AI summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {summaryRegenerating ? (
+                <div className="space-y-2 py-1" aria-busy="true" aria-live="polite">
+                  <div className="shimmer" style={{ height: 14, width: "100%" }}></div>
+                  <div className="shimmer" style={{ height: 14, width: "92%" }}></div>
+                  <div className="shimmer" style={{ height: 14, width: "75%" }}></div>
+                  <div className="shimmer" style={{ height: 14, width: "85%" }}></div>
+                </div>
+              ) : summary ? (
+                <>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{summary}</p>
+                  {summaryAt && (
+                    <p className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
+                      Generated {new Date(summaryAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  A summary will appear here once you&apos;ve added arrival dates, notes, or activities for this stop.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Stay details */}
           {(stop.arrivalDate || stop.departureDate || stop.checkInTime || stop.checkOutTime) && (
@@ -474,44 +507,6 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {/* Summary tab */}
-      {tab === "summary" && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-gray-400" />
-              AI summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {summaryRegenerating ? (
-              <div className="space-y-2 py-1" aria-busy="true" aria-live="polite">
-                <div className="shimmer" style={{ height: 14, width: "100%" }}></div>
-                <div className="shimmer" style={{ height: 14, width: "92%" }}></div>
-                <div className="shimmer" style={{ height: 14, width: "75%" }}></div>
-                <div className="shimmer" style={{ height: 14, width: "85%" }}></div>
-              </div>
-            ) : summary ? (
-              <>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{summary}</p>
-                {summaryAt && (
-                  <p className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
-                    Generated {new Date(summaryAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="py-6 text-center">
-                <Sparkles className="h-8 w-8 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm text-gray-500">
-                  A summary will appear here once you&apos;ve added arrival dates or notes for this stop.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       )}
 
       {/* Things to do tab */}
