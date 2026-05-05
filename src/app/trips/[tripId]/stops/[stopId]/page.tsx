@@ -8,7 +8,7 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import { StopDetailClient } from "./StopDetailClient";
 import { sortStopsByDate } from "@/lib/stops";
 import { getPlaceContact, findPlaceContact } from "@/lib/places";
-import type { StopNote } from "@/types/stop";
+import type { StopNote, Activity } from "@/types/stop";
 
 // Always read fresh — the cached summary updates server-side when
 // booking fields change, and we don't want any RSC caching to serve
@@ -51,6 +51,7 @@ export default async function StopDetailPage({
     : await findPlaceContact(stop.name, stop.address);
 
   const notes: StopNote[] = (stop.notes as StopNote[] | undefined) ?? [];
+  const activities: Activity[] = (stop.activities as Activity[] | undefined) ?? [];
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -82,6 +83,8 @@ export default async function StopDetailPage({
           tripId,
           name: stop.name,
           address: stop.address,
+          lat: stop.lat,
+          lng: stop.lng,
           arrivalDate: stop.arrivalDate,
           departureDate: stop.departureDate,
           checkInTime: stop.checkInTime,
@@ -89,6 +92,7 @@ export default async function StopDetailPage({
           bookingStatus: stop.bookingStatus as "enquiry" | "pending" | "confirmed" | undefined,
         }}
         initialNotes={notes}
+        initialActivities={activities}
         contact={contact}
         initialSummary={stop.summary}
         initialSummaryGeneratedAt={stop.summaryGeneratedAt}

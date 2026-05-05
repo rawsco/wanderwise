@@ -61,6 +61,14 @@ export default $config({
           globalIndexes: {
             GSI1: { hashKey: "gsi1pk", rangeKey: "gsi1sk" },
           },
+          // DynamoDB auto-deletes items whose `ttl` (epoch seconds) has passed.
+          // Used by SearchCacheEntity (places-search results, 30-day expiry).
+          // Items without a `ttl` attribute are unaffected.
+          transform: {
+            table: (args) => {
+              args.ttl = { attributeName: "ttl", enabled: true };
+            },
+          },
         })
       : undefined;
 
