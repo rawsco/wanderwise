@@ -276,12 +276,12 @@ export function StopDetailClient({ stop, initialNotes, initialActivities, contac
       {tab === "booking" && (
         <div className="space-y-4">
 
-          {/* AI summary */}
+          {/* Stop summary */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-gray-400" />
-                AI summary
+                Stop summary
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
