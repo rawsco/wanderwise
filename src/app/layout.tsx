@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Navbar } from "@/components/layout/Navbar";
+import { NavbarShell } from "@/components/layout/NavbarShell";
 import { Toaster } from "sonner";
 
 const geist = Geist({ subsets: ["latin"] });
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" style={{ colorScheme: "light" }}>
       <body className={`${geist.className} bg-gray-50 min-h-screen`}>
         <Providers>
-          <Navbar />
+          <NavbarShell />
           <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
             {children}
           </main>

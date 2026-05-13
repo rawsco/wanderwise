@@ -7,9 +7,18 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { signOutFully } from "@/lib/cognito-signout";
 
-export function Navbar() {
+type NavbarProps = {
+  inProgressCount?: number;
+  inProgressTripId?: string;
+};
+
+export function Navbar({ inProgressCount = 0, inProgressTripId }: NavbarProps = {}) {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
+
+  const inProgressHref = inProgressCount === 1 && inProgressTripId
+    ? `/trips/${inProgressTripId}`
+    : "/trips";
 
   return (
     <nav className="border-b border-gray-200 bg-white">
@@ -23,6 +32,17 @@ export function Navbar() {
           <div className="hidden lg:flex items-center gap-4">
             {session ? (
               <>
+                {inProgressCount > 0 ? (
+                  <Link href={inProgressHref} className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700">
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    In Progress
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-sm text-gray-300 cursor-not-allowed" aria-disabled="true">
+                    <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+                    In Progress
+                  </span>
+                )}
                 <Link href="/trips" className="text-sm text-gray-600 hover:text-gray-900">My Trips</Link>
                 <Link href="/profiles" className="text-sm text-gray-600 hover:text-gray-900">Group</Link>
                 <Button variant="outline" size="sm" onClick={() => signOutFully()}>
@@ -45,6 +65,17 @@ export function Navbar() {
           <div className="lg:hidden border-t border-gray-100 py-2 flex flex-col">
             {session ? (
               <>
+                {inProgressCount > 0 ? (
+                  <Link href={inProgressHref} className="flex items-center gap-2 text-sm font-semibold text-emerald-600 py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    In Progress
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-2 text-sm font-medium text-gray-300 py-3 px-1 border-b border-gray-50 cursor-not-allowed" aria-disabled="true">
+                    <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+                    In Progress
+                  </span>
+                )}
                 <Link href="/trips" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>My Trips</Link>
                 <Link href="/profiles" className="flex items-center text-sm text-gray-700 font-medium py-3 px-1 border-b border-gray-50" onClick={() => setOpen(false)}>Group</Link>
                 <button type="button" className="flex items-center text-sm text-left text-red-500 font-medium py-3 px-1" onClick={() => signOutFully()}>Sign out</button>
