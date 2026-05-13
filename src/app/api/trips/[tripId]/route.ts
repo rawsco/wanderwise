@@ -122,6 +122,20 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ trip
     const user = await requireAuth();
     const { tripId } = await params;
 
+    const owned = await TripEntity.query.byUser({ userId: user.id })
+      .where(({ tripId: tid }, { eq }) => eq(tid, tripId))
+      .go();
+    if (!owned.data[0]) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const stopsResult = await StopEntity.query.byTrip({ tripId }).go();
+    await Promise.all(
+      stopsResult.data.map(stop =>
+        StopEntity.delete({ tripId, stopId: stop.stopId }).go()
+      )
+    );
+
     await TripEntity.delete({ userId: user.id, tripId }).go();
 
     return NextResponse.json({ success: true });

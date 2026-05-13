@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Calendar, MapPin, CheckCircle2, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { DeleteTripButton } from "./DeleteTripButton";
 
 const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "🐶", cat: "🐱" };
 
@@ -40,10 +41,11 @@ interface TripCardProps {
 
 export function TripCard({ tripId, name, description, startDate, endDate, members = [], stopCount = 0, statuses = [], segments = [] }: TripCardProps) {
   return (
-    <Link href={`/trips/${tripId}`}>
+    <div className="relative h-full">
+      <Link href={`/trips/${tripId}`} className="block h-full">
       <Card className="hover:shadow-md transition-colors cursor-pointer h-full overflow-hidden flex flex-col">
         <CardContent className="pt-6 flex-1">
-          <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-start justify-between gap-2 mb-3 pr-10">
             <h3 className="font-semibold text-base leading-tight text-gray-900">{name}</h3>
             {statuses.length > 0 && (
               <div className="flex items-center gap-1.5 shrink-0">
@@ -90,6 +92,12 @@ export function TripCard({ tripId, name, description, startDate, endDate, member
           </div>
         )}
       </Card>
-    </Link>
+      </Link>
+      <DeleteTripButton
+        tripId={tripId}
+        tripName={name}
+        className="absolute top-2 right-2 z-10"
+      />
+    </div>
   );
 }
