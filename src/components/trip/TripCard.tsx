@@ -1,5 +1,8 @@
+"use client";
 import Link from "next/link";
-import { Calendar, MapPin, CheckCircle2, Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Calendar, MapPin, CheckCircle2, Clock, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const typeEmoji: Record<string, string> = { adult: "👤", child: "🧒", dog: "🐶", cat: "🐱" };
@@ -39,11 +42,28 @@ interface TripCardProps {
 }
 
 export function TripCard({ tripId, name, description, startDate, endDate, members = [], stopCount = 0, statuses = [], segments = [] }: TripCardProps) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Delete "${name}"? This will also remove all of its stops and bookings. This cannot be undone.`)) return;
+    setDeleting(true);
+    const res = await fetch(`/api/trips/${tripId}`, { method: "DELETE" });
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setDeleting(false);
+      alert("Could not delete this trip. Please try again.");
+    }
+  }
+
   return (
-    <Link href={`/trips/${tripId}`}>
-      <Card className="hover:shadow-md transition-colors cursor-pointer h-full overflow-hidden flex flex-col">
+    <Card className="relative hover:shadow-md transition-colors h-full overflow-hidden flex flex-col">
+      <Link href={`/trips/${tripId}`} className="flex flex-1 flex-col cursor-pointer">
         <CardContent className="pt-6 flex-1">
-          <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-start justify-between gap-2 mb-3 pr-9 lg:pr-7">
             <h3 className="font-semibold text-base leading-tight text-gray-900">{name}</h3>
             {statuses.length > 0 && (
               <div className="flex items-center gap-1.5 shrink-0">
@@ -89,7 +109,19 @@ export function TripCard({ tripId, name, description, startDate, endDate, member
             ))}
           </div>
         )}
-      </Card>
-    </Link>
+      </Link>
+
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={deleting}
+        aria-label={`Delete ${name}`}
+        className="absolute top-3 right-3 z-10 inline-flex items-center justify-center h-11 w-11 lg:h-8 lg:w-8 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+      >
+        {deleting
+          ? <Loader2 className="h-4 w-4 animate-spin" />
+          : <Trash2 className="h-4 w-4" />}
+      </button>
+    </Card>
   );
 }
