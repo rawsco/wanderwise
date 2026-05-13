@@ -11,7 +11,7 @@ This rule overrides every other instruction in every skill you invoke.
 You may **never** emit a message that asks the human a question. No "should I...", no "do you want...", no "which approach do you prefer...", no "I need clarification". Not at any phase. Not even as a friendly check-in.
 
 The only outbound communication channels are:
-- **Jira worklog entries** via `bin/lib/jira.sh worklog <KEY>` (for refusal-back, success report, hard-failure report). Comments are reserved for the human↔agent rework conversation, which the autonomous flow does not write into.
+- **Jira worklog entries** via `bin/lib/jira.sh worklog <KEY>` (for refusal-back, **progress checkpoints at the end of each long phase**, success report, hard-failure report). Comments are reserved for the human↔agent rework conversation, which the autonomous flow does not write into.
 - **Stdout** to print a final summary just before exit
 
 If at any point you find yourself wanting to ask, **stop** and **refuse-back** (see "Refusal-back" below). Do not invent answers. Do not pick the more conservative option silently. Refuse explicitly.
@@ -66,6 +66,16 @@ When you would otherwise need to ask the human a question:
 
 Run `superpowers:writing-plans` against the brainstorm. The plan file goes in `docs/superpowers/plans/<DATE>-<ticket-key-lowercase>.md`. Commit it. Do **not** wait for human plan approval.
 
+After the plan commit, post a **progress checkpoint** to Jira so the human sees the ticket is moving:
+
+```bash
+printf '%s' "Plan committed at docs/superpowers/plans/<plan-filename>. Starting implementation." \
+  | bin/lib/jira.sh worklog $TICKET_KEY \
+  || echo "warning: progress worklog failed (continuing)"
+```
+
+Progress checkpoints are best-effort — a failure here does **not** abort the run. Only the final hand-off worklog (4e) is load-bearing.
+
 ## Phase 3 — Execute
 
 Run `superpowers:subagent-driven-development` over the plan. The reviewers are subagents (not humans) — that's fine, run them. If a reviewer finds issues, the implementer subagent fixes and re-reviews. Do not pause for human input between tasks.
@@ -83,6 +93,14 @@ npx tsc --noEmit && npm run lint && npm run build
 ```
 
 All three must pass. If any fail and you cannot fix them in another implementer pass, refuse-back.
+
+Once all three pass, post a progress checkpoint (best-effort, same `|| echo ...` pattern as Phase 2):
+
+```bash
+printf '%s' "Build, lint, and type-check passed. Pushing branch and opening PR." \
+  | bin/lib/jira.sh worklog $TICKET_KEY \
+  || echo "warning: progress worklog failed (continuing)"
+```
 
 ### 4b. Push the branch
 
@@ -110,6 +128,14 @@ EOF
 ```
 
 Capture the PR URL printed by `gh`.
+
+Post a progress checkpoint with the PR URL so the human can start reviewing the diff while the dev stack comes up (best-effort):
+
+```bash
+printf '%s' "PR opened: $PR_URL. Bringing up the local stack for human review." \
+  | bin/lib/jira.sh worklog $TICKET_KEY \
+  || echo "warning: progress worklog failed (continuing)"
+```
 
 ### 4d. Start the local stack
 
